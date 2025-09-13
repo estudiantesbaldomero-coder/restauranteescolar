@@ -1,174 +1,314 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Restaurante Escolar IE Baldomero Sanín Cano</title>
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0; padding: 0;
-      background: #f4f6f9; color: #333;
-    }
-    header {
-      background: #00695c; color: #fff;
-      padding: 15px; text-align: center;
-      font-size: 22px; font-weight: bold;
-    }
-    main { padding: 20px; }
-    section {
-      background: #fff; margin-bottom: 20px;
-      padding: 15px; border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    h2 { margin-top: 0; color: #00695c; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #e0f2f1; }
-    button {
-      background: #00695c; color: white; border: none;
-      padding: 8px 12px; margin: 5px; border-radius: 6px;
-      cursor: pointer;
-    }
-    button:hover { background: #004d40; }
-    #qr-reader { width: 100%; max-width: 400px; margin: auto; }
-    @media (max-width: 600px) {
-      header { font-size: 18px; }
-      button { width: 100%; margin-top: 8px; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Restaurante Escolar IE Baldomero Sanín Cano</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+
+<style>
+body { padding: 1rem; background:#f8f9fa; }
+header { text-align:center; margin-bottom:1rem; }
+.card-body h5 { margin-bottom:0.75rem; }
+@media print {
+  body * { visibility: hidden; }
+  #print-area, #print-area * { visibility: visible; }
+  #print-area { position: absolute; left: 0; top: 0; width:100%; }
+  .label { page-break-inside: avoid; }
+}
+.scanner-canvas { width: 100%; height: auto; border-radius:8px; }
+</style>
 </head>
 <body>
-  <header>🍽 Restaurante Escolar IE Baldomero Sanín Cano</header>
-  <main>
-    <!-- Carga de estudiantes -->
-    <section>
-      <h2>Cargar estudiantes (CSV)</h2>
-      <input type="file" id="csvFile" accept=".csv">
-      <button onclick="loadCSV()">Cargar</button>
-    </section>
+<header>
+  <h1>Restaurante Escolar</h1>
+  <h3>IE Baldomero Sanín Cano</h3>
+  <p class="text-muted">Carga CSV • Códigos QR • Escáner • Asistencia • Impresión • Responsive</p>
+</header>
 
-    <!-- Lista de estudiantes -->
-    <section>
-      <h2>Gestión de estudiantes</h2>
-      <table id="studentsTable">
-        <thead>
-          <tr>
-            <th>Nombre</th><th>Grado</th><th>QR</th><th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
+<div class="container">
+  <div class="row g-3">
+    <!-- Controls -->
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-body">
 
-    <!-- Escáner de QR -->
-    <section>
-      <h2>Escáner de asistencia</h2>
-      <div id="qr-reader"></div>
-      <p><strong>Último escaneo:</strong> <span id="lastScan">Ninguno</span></p>
-    </section>
+          <!-- Import CSV -->
+          <h5>Importar estudiantes (CSV)</h5>
+          <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
+          <small class="text-muted">CSV: encabezados <code>name,grade</code></small>
+          <button id="importBtn" class="btn btn-primary w-100 mt-2">Cargar CSV</button>
+          <hr />
 
-    <!-- Dashboard -->
-    <section>
-      <h2>Dashboard de asistencia</h2>
-      <p>Total estudiantes: <span id="totalStudents">0</span></p>
-      <p>Asistencias de hoy (<span id="todayDay"></span>): <span id="todayAttendance">0</span></p>
-    </section>
-  </main>
+          <!-- Add manually -->
+          <h5>Crear estudiante manual</h5>
+          <input id="nameInput" class="form-control mb-2" placeholder="Nombre estudiante" />
+          <input id="gradeInput" class="form-control mb-2" placeholder="Grado (ej: 10-3)" />
+          <button id="addBtn" class="btn btn-success w-100">Agregar estudiante</button>
+          <hr />
+
+          <!-- QR Scanner -->
+          <h5>Escáner QR</h5>
+          <div id="scanner-controls">
+            <button id="startScanner" class="btn btn-outline-primary w-100 mb-1">Iniciar escáner</button>
+            <button id="stopScanner" class="btn btn-outline-secondary w-100 mb-1">Detener escáner</button>
+            <small class="text-muted">El QR debe contener JSON: <code>{"school":"IE_Baldomero","id":"xxx"}</code></small>
+          </div>
+          <div id="scanner-area" style="display:none;">
+            <video id="video" autoplay playsinline style="width:100%;border-radius:8px;"></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div class="mt-2">
+              <small id="scanStatus" class="text-success"></small>
+            </div>
+          </div>
+          <hr/>
+
+          <!-- Printing -->
+          <h5>Impresión</h5>
+          <button id="printSelected" class="btn btn-outline-dark w-100">Imprimir QRs seleccionados</button>
+          <button id="printAll" class="btn btn-dark w-100 mt-1">Imprimir todos los QRs</button>
+
+        </div>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="card">
+        <div class="card-body">
+          <h5>Dashboard (tiempo real)</h5>
+          <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
+          <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
+          <p>Asistencias totales: <strong id="attTotal">0</strong></p>
+          <button id="clearData" class="btn btn-sm btn-danger">Borrar toda la base (local)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student list & print area -->
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5>Lista de estudiantes</h5>
+          <div class="mb-2">
+            <input id="search" class="form-control" placeholder="Buscar por nombre o grado..." />
+          </div>
+          <div id="studentsList" class="list-group" style="max-height:60vh; overflow:auto;"></div>
+        </div>
+      </div>
+
+      <div id="print-area" style="display:none; background:#fff; padding:1rem;">
+        <div id="labelsContainer" class="d-flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<audio id="audioReg" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
 
 <script>
-  let students = JSON.parse(localStorage.getItem("students")) || [];
-  let attendance = JSON.parse(localStorage.getItem("attendance")) || {};
-  
-  // Día actual (lunes a viernes)
-  const diasSemana = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-  let today = new Date();
-  let dayName = diasSemana[today.getDay()];
-  document.getElementById("todayDay").innerText = dayName;
+// ---------- STORAGE ----------
+const STORAGE_STUDENTS='rs_students_v3';
+const STORAGE_ATT='rs_attendance_v3';
+function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
+function writeStudents(arr){ localStorage.setItem(STORAGE_STUDENTS,JSON.stringify(arr)); }
+function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT)||'{}'); }
+function writeAttendance(obj){ localStorage.setItem(STORAGE_ATT,JSON.stringify(obj)); }
 
-  // Renderizar tabla
-  function renderTable() {
-    let tbody = document.querySelector("#studentsTable tbody");
-    tbody.innerHTML = "";
-    students.forEach((st, i) => {
-      let tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${st.nombre}</td>
-        <td>${st.grado}</td>
-        <td><canvas id="qr-${i}"></canvas></td>
-        <td><button onclick="deleteStudent(${i})">Eliminar</button></td>
-      `;
-      tbody.appendChild(tr);
-      QRCode.toCanvas(document.getElementById(`qr-${i}`), st.id, { width: 60 });
-    });
-    document.getElementById("totalStudents").innerText = students.length;
-    updateDashboard();
-    localStorage.setItem("students", JSON.stringify(students));
+// ---------- UTILS ----------
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function todayKey(){ const d=new Date(); return `${d.getDate()}-${d.getMonth()+1}`; }
+
+// ---------- UI REFERENCES ----------
+const studentsList=document.getElementById('studentsList');
+const totalStudentsEl=document.getElementById('totalStudents');
+const attTodayEl=document.getElementById('attToday');
+const attTotalEl=document.getElementById('attTotal');
+document.getElementById('todayDate').textContent=todayKey();
+
+// ---------- RENDER ----------
+function renderAll(filter=''){
+  const students=readStudents();
+  const attendance=readAttendance();
+  totalStudentsEl.textContent=students.length;
+  const today=todayKey();
+  const attToday=attendance[today]?Object.keys(attendance[today]).length:0;
+  const attTotal=Object.values(attendance).reduce((s,obj)=>s+Object.keys(obj).length,0);
+  attTodayEl.textContent=attToday;
+  attTotalEl.textContent=attTotal;
+
+  studentsList.innerHTML='';
+  const q=filter.toLowerCase();
+  students.filter(s=>!q||(s.name&&s.name.toLowerCase().includes(q))||(s.grade&&s.grade.toLowerCase().includes(q)))
+          .sort((a,b)=>a.name.localeCompare(b.name))
+          .forEach(s=>{
+            const item=document.createElement('div');
+            item.className='list-group-item list-group-item-action d-flex align-items-center';
+            item.innerHTML=`<div class="flex-grow-1"><div><strong>${s.name}</strong> <small class="text-muted">${s.grade||''}</small></div></div>
+                              <div class="ms-3 text-end">
+                                <button class="btn btn-sm btn-outline-success me-1 btn-att">Asistencia</button>
+                                <button class="btn btn-sm btn-outline-secondary me-1 btn-qr">QR</button>
+                                <div class="form-check mt-2">
+                                  <input class="form-check-input select-for-print" type="checkbox" value="${s.id}" id="sel-${s.id}">
+                                  <label class="form-check-label small" for="sel-${s.id}">Seleccionar</label>
+                                </div>
+                              </div>`;
+            item.querySelector('.btn-att').onclick=()=>registerAttendance(s.id,true);
+            item.querySelector('.btn-qr').onclick=()=>showQRModal(s);
+            studentsList.appendChild(item);
+          });
+}
+
+document.getElementById('search').addEventListener('input',e=>renderAll(e.target.value));
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// ---------- QR MODAL ----------
+function showQRModal(student){
+  const payload=JSON.stringify({school:'IE_Baldomero',id:student.id});
+  const overlay=document.createElement('div');
+  Object.assign(overlay.style,{position:'fixed',left:0,right:0,top:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999});
+  const box=document.createElement('div');
+  box.style='background:#fff;padding:1rem;border-radius:8px;max-width:360px;width:90%;text-align:center;';
+  box.innerHTML=`<h5>${escapeHtml(student.name)}</h5><div id="qrHolder"></div>
+                 <button class="btn btn-sm btn-secondary ms-1 btn-close">Cerrar</button>`;
+  overlay.appendChild(box); document.body.appendChild(overlay);
+  const holder=box.querySelector('#qrHolder');
+  new QRCode(holder,{text:payload,width:200,height:200});
+  box.querySelector('.btn-close').onclick=()=>{document.body.removeChild(overlay);}
+}
+
+// ---------- ATTENDANCE ----------
+function registerAttendance(studentId,fromUI=false){
+  const attendance=readAttendance();
+  const key=todayKey();
+  if(!attendance[key]) attendance[key]={};
+  if(attendance[key][studentId]){
+    if(fromUI) alert('Ya registrado hoy.');
+    return false;
   }
+  attendance[key][studentId]=new Date().toISOString();
+  writeAttendance(attendance);
+  renderAll();
+  if(fromUI) document.getElementById('audioReg').play();
+  return true;
+}
 
-  // Cargar CSV
-  function loadCSV() {
-    const file = document.getElementById("csvFile").files[0];
-    if (!file) return alert("Selecciona un archivo CSV");
-    const reader = new FileReader();
-    reader.onload = e => {
-      const lines = e.target.result.split("\n").map(l => l.trim()).filter(l => l);
-      lines.forEach(line => {
-        let [nombre, grado] = line.split(",");
-        let id = nombre.trim() + "_" + grado.trim() + "_" + Date.now();
-        students.push({ nombre: nombre.trim(), grado: grado.trim(), id });
-      });
-      renderTable();
-    };
-    reader.readAsText(file);
+// ---------- CLEAR DATA ----------
+document.getElementById('clearData').addEventListener('click',()=>{
+  if(confirm('Borrar estudiantes y asistencias?')){
+    localStorage.removeItem(STORAGE_STUDENTS);
+    localStorage.removeItem(STORAGE_ATT);
+    renderAll();
   }
+});
 
-  // Eliminar estudiante
-  function deleteStudent(i) {
-    students.splice(i, 1);
-    renderTable();
+// ---------- DEMO STUDENTS ----------
+if(readStudents().length===0){
+  const sample=[
+    {id:uid(),name:'Carlos Pérez',grade:'10-1'},
+    {id:uid(),name:'María Gómez',grade:'9-2'},
+    {id:uid(),name:'Juan Rodríguez',grade:'11-3'},
+    {id:uid(),name:'Ana Morales',grade:'10-2'}
+  ];
+  writeStudents(sample);
+}
+
+renderAll();
+
+// ---------- CSV IMPORT ----------
+document.getElementById('importBtn').addEventListener('click',()=>{
+  const f=document.getElementById('csvFile').files[0];
+  if(!f){ alert('Seleccione un archivo CSV'); return; }
+  Papa.parse(f,{header:true,skipEmptyLines:true,
+    complete(results){
+      const rows=results.data;
+      const arr=readStudents();
+      let added=0;
+      for(const r of rows){
+        const name=(r.name||r.Nombre||r.nombre||'').trim();
+        const grade=(r.grade||r.Grade||r.grado||'').trim();
+        if(!name) continue;
+        arr.push({id:uid(),name,grade,createdAt:new Date().toISOString()});
+        added++;
+      }
+      writeStudents(arr);
+      alert(`Importación finalizada: ${added} estudiantes añadidos.`);
+      renderAll();
+    },
+    error(err){ alert('Error parseando CSV: '+err.message); }
+  });
+});
+
+// ---------- ADD MANUAL ----------
+document.getElementById('addBtn').addEventListener('click',()=>{
+  const name=document.getElementById('nameInput').value.trim();
+  const grade=document.getElementById('gradeInput').value.trim();
+  if(!name){ alert('Ingrese nombre'); return; }
+  const arr=readStudents(); arr.push({id:uid(),name,grade,createdAt:new Date().toISOString()});
+  writeStudents(arr);
+  document.getElementById('nameInput').value=''; document.getElementById('gradeInput').value='';
+  renderAll();
+});
+
+// ---------- QR SCANNER ----------
+let videoStream=null,scanning=false;
+const video=document.getElementById('video');
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const scanStatus=document.getElementById('scanStatus');
+let lastScanTime=0,SCAN_COOLDOWN_MS=1500;
+
+document.getElementById('startScanner').onclick=startScanner;
+document.getElementById('stopScanner').onclick=stopScanner;
+
+async function startScanner(){
+  if(scanning) return;
+  try{
+    let stream=null;
+    try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"}}}); }
+    catch(e){ stream=await navigator.mediaDevices.getUserMedia({video:true}); }
+    video.srcObject=stream; videoStream=stream; scanning=true;
+    document.getElementById('scanner-area').style.display='block';
+    scanLoop();
+  }catch(err){ alert('No se pudo acceder a la cámara. '+err.message); }
+}
+
+function stopScanner(){
+  scanning=false;
+  if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; }
+  document.getElementById('scanner-area').style.display='none';
+  scanStatus.textContent='';
+}
+
+function scanLoop(){
+  if(!scanning) return;
+  if(video.readyState===video.HAVE_ENOUGH_DATA){
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    try{
+      const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"attemptBoth"});
+      if(code){
+        const now=Date.now();
+        if(now-lastScanTime>SCAN_COOLDOWN_MS){
+          lastScanTime=now;
+          let parsed=null;
+          try{ parsed=JSON.parse(code.data); }catch(e){ parsed=null; }
+          if(parsed && parsed.school && parsed.id){
+            const ok=registerAttendance(parsed.id);
+            scanStatus.textContent=ok?`Asistencia registrada: ${parsed.id}`:`Ya registrada hoy: ${parsed.id}`;
+          } else { scanStatus.textContent='QR inválido'; }
+        }
+      } else { scanStatus.textContent='Buscando QR...'; }
+    }catch(e){ console.error('scan error',e); }
   }
+  requestAnimationFrame(scanLoop);
+}
 
-  // Registrar asistencia con voz
-  function registerAttendance(studentId) {
-    if (dayName === "Domingo" || dayName === "Sábado") {
-      alert("No se registra asistencia en fin de semana");
-      return;
-    }
-    if (!attendance[dayName]) attendance[dayName] = [];
-    if (!attendance[dayName].includes(studentId)) {
-      attendance[dayName].push(studentId);
-      localStorage.setItem("attendance", JSON.stringify(attendance));
-      updateDashboard();
-
-      // Voz
-      let msg = new SpeechSynthesisUtterance("estudiante registrado");
-      msg.lang = "es-ES";
-      window.speechSynthesis.speak(msg);
-    }
-  }
-
-  // Dashboard
-  function updateDashboard() {
-    let todayCount = attendance[dayName] ? attendance[dayName].length : 0;
-    document.getElementById("todayAttendance").innerText = todayCount;
-  }
-
-  // QR Scanner
-  function onScanSuccess(decodedText) {
-    document.getElementById("lastScan").innerText = decodedText;
-    let student = students.find(st => st.id === decodedText);
-    if (student) {
-      registerAttendance(student.id);
-    }
-  }
-  let html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
-  html5QrcodeScanner.render(onScanSuccess);
-
-  // Inicializar
-  renderTable();
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopScanner(); });
 </script>
 </body>
 </html>
-
