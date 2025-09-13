@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Restaurante Escolar IE Baldomero Sanín Cano</title>
+
+<!-- Bootstrap (para responsive y UI rápida) -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- Librerías -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- QR generation (QRCode.js) -->
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+
+<style>
+  body { padding: 1rem; background:#f8f9fa; }
+  header { text-align:center; margin-bottom:1rem; }
+  .qr-card { border:1px dashed #ddd; padding:0.5rem; border-radius:8px; background:#fff;}
+  /* Print styles for QR labels */
+  @media print {
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area { position: absolute; left: 0; top: 0; width:100%; }
+    .label { page-break-inside: avoid; }
+  }
+  /* Small touches */
+  .scanner-canvas { width: 100%; height: auto; border-radius:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Restaurante Escolar</h1>
+  <h3>IE Baldomero Sanín Cano</h3>
+  <p class="text-muted">Carga CSV • Códigos QR • Escáner • Asistencia • Impresión • Responsive</p>
+</header>
+
+<div class="container">
+  <div class="row g-3">
+    <!-- Left column: Controls -->
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5>1) Importar estudiantes (CSV)</h5>
+          <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
+          <small class="text-muted">CSV: encabezados <code>name,grade</code> (name obligatorio)</small>
+          <button id="importBtn" class="btn btn-primary w-100 mt-2">Cargar CSV</button>
+          <hr />
+          <h5>2) Crear estudiante manual</h5>
+          <input id="nameInput" class="form-control mb-2" placeholder="Nombre estudiante" />
+          <input id="gradeInput" class="form-control mb-2" placeholder="Grado (ej: 10-3)" />
+          <button id="addBtn" class="btn btn-success w-100">Agregar estudiante</button>
+          <hr />
+          <h5>3) Escáner QR</h5>
+          <div id="scanner-controls" class="mb-2">
+            <button id="startScanner" class="btn btn-outline-primary w-100 mb-1">Iniciar escáner</button>
+            <button id="stopScanner" class="btn btn-outline-secondary w-100 mb-1">Detener escáner</button>
+            <small class="text-muted">El QR debe contener JSON: <code>{"school":"IE_Baldomero","id":"xxx"}</code></small>
+          </div>
+          <div id="scanner-area" style="display:none;">
+            <video id="video" autoplay playsinline style="width:100%;border-radius:8px;"></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div class="mt-2">
+              <small id="scanStatus" class="text-success"></small>
+            </div>
+          </div>
+          <hr/>
+          <h5>Impresión</h5>
+          <button id="printSelected" class="btn btn-outline-dark w-100">Imprimir QRs seleccionados</button>
+          <button id="printAll" class="btn btn-dark w-100 mt-1">Imprimir todos los QRs</button>
+        </div>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="card">
+        <div class="card-body">
+          <h5>Dashboard (tiempo real)</h5>
+          <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
+          <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
+          <p>Asistencias totales: <strong id="attTotal">0</strong></p>
+          <button id="clearData" class="btn btn-sm btn-danger">Borrar toda la base (local)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Student list & details -->
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5>Lista de estudiantes</h5>
+          <div class="mb-2">
+            <input id="search" class="form-control" placeholder="Buscar por nombre o grado..." />
+          </div>
+          <div id="studentsList" class="list-group" style="max-height:60vh; overflow:auto;"></div>
+        </div>
+      </div>
+
+      <!-- Print area hidden -->
+      <div id="print-area" style="display:none; background:#fff; padding:1rem;">
+        <div id="labelsContainer" class="d-flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== STORAGE (localStorage) ======
+   We'll store:
+   - students: array of {id, name, grade, createdAt}
+   - attendance: { 'YYYY-MM-DD': { studentId: timestamp, ... }, ... }
+   These live in localStorage under keys 'rs_students' and 'rs_attendance'.
+*/
+
+const STORAGE_STUDENTS = 'rs_students_v1';
+const STORAGE_ATT = 'rs_attendance_v1';
+
+function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS) || '[]'); }
+function writeStudents(arr){ localStorage.setItem(STORAGE_STUDENTS, JSON.stringify(arr)); }
+function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT) || '{}'); }
+function writeAttendance(obj){ localStorage.setItem(STORAGE_ATT, JSON.stringify(obj)); }
+
+/* Utils */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+
+/* UI references */
+const studentsList = document.getElementById('studentsList');
+const totalStudentsEl = document.getElementById('totalStudents');
+const attTodayEl = document.getElementById('attToday');
+const attTotalEl = document.getElementById('attTotal');
+document.getElementById('todayDate').textContent = todayKey();
+
+/* Load initial */
+renderAll();
+
+/* Add manual */
+document.getElementById('addBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('nameInput').value.trim();
+  const grade = document.getElementById('gradeInput').value.trim();
+  if(!name){ alert('Ingrese nombre'); return; }
+  const s = { id: uid(), name, grade, createdAt:new Date().toISOString() };
+  const arr = readStudents(); arr.push(s); writeStudents(arr);
+  document.getElementById('nameInput').value=''; document.getElementById('gradeInput').value='';
+  renderAll();
+});
+
+/* CSV import */
+document.getElementById('importBtn').addEventListener('click', async ()=>{
+  const f = document.getElementById('csvFile').files[0];
+  if(!f){ alert('Seleccione un archivo CSV'); return; }
+  Papa.parse(f, {
+    header: true,
+    skipEmptyLines: true,
+    complete(results){
+      const rows = results.data; // expect {name, grade}
+      const arr = readStudents();
+      let added=0;
+      for(const r of rows){
+        const name = (r.name || r.Nombre || r.nombre || r.NOMBRE || '').trim();
+        const grade = (r.grade || r.Grade || r.grado || r.Grade || '').trim();
+        if(!name) continue;
+        const s = { id: uid(), name, grade, createdAt:new Date().toISOString() };
+        arr.push(s); added++;
+      }
+      writeStudents(arr);
+      alert(`Importación finalizada: ${added} estudiantes añadidos.`);
+      renderAll();
+    },
+    error(err){ alert('Error parseando CSV: ' + err.message); }
+  });
+});
+
+/* Render list */
+function renderAll(filter=''){
+  const students = readStudents();
+  const attendance = readAttendance();
+  // dashboard
+  totalStudentsEl.textContent = students.length;
+  const today = todayKey();
+  const attToday = attendance[today] ? Object.keys(attendance[today]).length : 0;
+  const attTotal = Object.values(attendance).reduce((s,obj)=> s + Object.keys(obj).length, 0);
+  attTodayEl.textContent = attToday;
+  attTotalEl.textContent = attTotal;
+
+  // list
+  studentsList.innerHTML = '';
+  const q = filter.toLowerCase();
+  students
+    .filter(s => !q || (s.name && s.name.toLowerCase().includes(q)) || (s.grade && s.grade.toLowerCase().includes(q)))
+    .sort((a,b)=> a.name.localeCompare(b.name))
+    .forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'list-group-item list-group-item-action d-flex align-items-center';
+      item.innerHTML = `
+        <div class="flex-grow-1">
+          <div><strong>${escapeHtml(s.name)}</strong> <small class="text-muted"> - ${escapeHtml(s.grade||'')}</small></div>
+          <div class="small text-muted">ID: ${s.id}</div>
+        </div>
+        <div class="ms-3 text-end">
+          <button class="btn btn-sm btn-outline-secondary me-1 btn-qr">QR</button>
+          <button class="btn btn-sm btn-outline-success me-1 btn-att">Asistencia</button>
+          <button class="btn btn-sm btn-outline-primary me-1 btn-edit">Editar</button>
+          <button class="btn btn-sm btn-outline-danger btn-del">Borrar</button>
+          <div class="form-check mt-2">
+            <input class="form-check-input select-for-print" type="checkbox" value="${s.id}" id="sel-${s.id}">
+            <label class="form-check-label small" for="sel-${s.id}">Seleccionar</label>
+          </div>
+        </div>
+      `;
+      // button actions
+      item.querySelector('.btn-del').onclick = ()=>{
+        if(confirm('¿Borrar estudiante?')) {
+          const arr = readStudents().filter(x => x.id !== s.id);
+          writeStudents(arr); renderAll();
+        }
+      };
+      item.querySelector('.btn-edit').onclick = ()=>{
+        const newName = prompt('Nuevo nombre', s.name);
+        if(newName === null) return;
+        const newGrade = prompt('Nuevo grado', s.grade||'');
+        if(newName.trim()===''){ alert('Nombre vacío'); return; }
+        const arr = readStudents().map(x => x.id===s.id ? {...x, name:newName.trim(), grade:(newGrade||'').trim()} : x);
+        writeStudents(arr); renderAll();
+      };
+      item.querySelector('.btn-att').onclick = ()=>{
+        registerAttendance(s.id, true);
+      };
+      item.querySelector('.btn-qr').onclick = ()=>{
+        // show small modal-like QR
+        showQRModal(s);
+      };
+      studentsList.appendChild(item);
+    });
+}
+
+/* search */
+document.getElementById('search').addEventListener('input', (e)=> renderAll(e.target.value));
+
+/* Escape helper */
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
+
+/* ----- QR generation for a student (renders into a small modal) ----- */
+function showQRModal(student){
+  // build payload
+  const payload = JSON.stringify({ school:'IE_Baldomero', id: student.id });
+  // small overlay
+  const overlay = document.createElement('div');
+  Object.assign(overlay.style, {
+    position:'fixed', left:0, right:0, top:0, bottom:0, background:'rgba(0,0,0,0.6)',
+    display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999
+  });
+  const box = document.createElement('div');
+  box.style = 'background:#fff; padding:1rem; border-radius:8px; max-width:360px; width:90%; text-align:center;';
+  box.innerHTML = `<h5>${escapeHtml(student.name)}</h5><div id="qrHolder"></div>
+    <p class="small text-muted">${escapeHtml(student.grade||'')}</p>
+    <button class="btn btn-sm btn-primary btn-download">Descargar PNG</button>
+    <button class="btn btn-sm btn-secondary ms-1 btn-close">Cerrar</button>`;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  // draw QR
+  const holder = box.querySelector('#qrHolder');
+  const qrDiv = document.createElement('div'); holder.appendChild(qrDiv);
+  const qrcode = new QRCode(qrDiv, { text: payload, width:200, height:200, correctLevel: QRCode.CorrectLevel.H });
+  box.querySelector('.btn-close').onclick = ()=> { qrcode.clear(); document.body.removeChild(overlay); };
+  box.querySelector('.btn-download').onclick = ()=>{
+    // canvas from QR's img
+    const img = holder.querySelector('img');
+    if(!img){
+      alert('No se generó imagen de QR');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = img.src;
+    link.download = `${student.name.replace(/\s+/g,'_')}_qr.png`;
+    link.click();
+  };
+}
+
+/* ----- Attendance registration ----- */
+function registerAttendance(studentId, fromUI=false){
+  const attendance = readAttendance();
+  const key = todayKey();
+  if(!attendance[key]) attendance[key] = {};
+  if(attendance[key][studentId]){
+    if(fromUI) alert('Asistencia ya registrada hoy para este estudiante.');
+    return false;
+  }
+  attendance[key][studentId] = new Date().toISOString();
+  writeAttendance(attendance);
+  renderAll();
+  if(fromUI) alert('Asistencia registrada.');
+  return true;
+}
+
+/* ----- Printing QR labels ----- */
+function collectSelectedIds(){
+  const checks = Array.from(document.querySelectorAll('.select-for-print:checked'));
+  return checks.map(c => c.value);
+}
+function buildPrintLabels(ids){
+  const students = readStudents();
+  const chosen = ids.length ? students.filter(s=> ids.includes(s.id)) : students;
+  const container = document.getElementById('labelsContainer');
+  container.innerHTML = '';
+  for(const s of chosen){
+    // for each label create div with qr image (use QRCode with toDataURL by creating temporary canvas)
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.style = 'width:180px; padding:6px; border:1px solid #ddd; display:flex; flex-direction:column; align-items:center; margin:6px; background:#fff;';
+    const holder = document.createElement('div');
+    label.appendChild(holder);
+    const nameEl = document.createElement('div');
+    nameEl.style = 'font-size:12px; margin-top:6px; text-align:center;';
+    nameEl.textContent = s.name + ' - ' + (s.grade||'');
+    label.appendChild(nameEl);
+    container.appendChild(label);
+
+    // generate QR inside holder using QRCode lib (img)
+    const tmp = document.createElement('div');
+    holder.appendChild(tmp);
+    const payload = JSON.stringify({ school:'IE_Baldomero', id: s.id });
+    new QRCode(tmp, { text: payload, width:140, height:140 });
+  }
+  return container;
+}
+
+document.getElementById('printSelected').addEventListener('click', ()=>{
+  const ids = collectSelectedIds();
+  if(ids.length===0){ alert('No hay estudiantes seleccionados.'); return; }
+  const cont = buildPrintLabels(ids);
+  // show print area and call print
+  document.getElementById('print-area').style.display='block';
+  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; }, 500);
+});
+
+document.getElementById('printAll').addEventListener('click', ()=>{
+  buildPrintLabels([]);
+  document.getElementById('print-area').style.display='block';
+  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; }, 500);
+});
+
+/* Clear data */
+document.getElementById('clearData').addEventListener('click', ()=>{
+  if(confirm('Borrar estudiantes y asistencias?')){ localStorage.removeItem(STORAGE_STUDENTS); localStorage.removeItem(STORAGE_ATT); renderAll(); }
+});
+
+/* ====== QR Scanner using getUserMedia + jsQR ====== */
+let videoStream = null;
+let scanning = false;
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const scanStatus = document.getElementById('scanStatus');
+
+document.getElementById('startScanner').addEventListener('click', startScanner);
+document.getElementById('stopScanner').addEventListener('click', stopScanner);
+
+async function startScanner(){
+  if(scanning) return;
+  // request video (prefer rear camera)
+  try{
+    const constraints = { video: { facingMode: { exact: "environment" } } };
+    let stream = null;
+    try { stream = await navigator.mediaDevices.getUserMedia(constraints); }
+    catch(e){ // fallback to default camera
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+    video.srcObject = stream;
+    videoStream = stream;
+    document.getElementById('scanner-area').style.display = 'block';
+    scanning = true;
+    scanLoop();
+  }catch(err){
+    alert('No se pudo acceder a la cámara. Revisa permisos o usa HTTPS/localhost. ' + err.message);
+  }
+}
+
+function stopScanner(){
+  scanning = false;
+  if(videoStream){
+    const tracks = videoStream.getTracks();
+    tracks.forEach(t => t.stop());
+    videoStream = null;
+  }
+  document.getElementById('scanner-area').style.display = 'none';
+  scanStatus.textContent = '';
+}
+
+/* prevent multiple quick reads: use cooldown */
+let lastScanTime = 0;
+const SCAN_COOLDOWN_MS = 1500;
+
+function scanLoop(){
+  if(!scanning) return;
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    // sync canvas size
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    try{
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "attemptBoth" });
+      if(code){
+        const now = Date.now();
+        if(now - lastScanTime > SCAN_COOLDOWN_MS){
+          lastScanTime = now;
+          // try parse
+          let parsed = null;
+          try { parsed = JSON.parse(code.data); }
+          catch(e){ parsed = null; }
+          if(parsed && parsed.school && parsed.id){
+            // register attendance if not already
+            const ok = registerAttendance(parsed.id);
+            scanStatus.textContent = ok ? `Asistencia registrada: ${parsed.id}` : `Ya registrada hoy: ${parsed.id}`;
+            // quick visual: draw rectangle
+            drawBoundingBox(code.location);
+          } else {
+            scanStatus.textContent = 'QR inválido (payload no reconocido).';
+          }
+        }
+      } else {
+        scanStatus.textContent = 'Buscando QR...';
+      }
+    }catch(e){
+      console.error('scan error', e);
+    }
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+function drawBoundingBox(loc){
+  // loc contains topLeftCorner etc in jsQR output - draw over video canvas
+  // show a small flash by drawing on the visible video; here we use overlayed canvas (hidden) but we can show effect:
+  // For simplicity, just show text for now.
+  // (Optional) implement visible box if needed.
+}
+
+/* ---- Helpers: make demo students if none exist (for quicker testing) ---- */
+if(readStudents().length === 0){
+  // create 4 demo students
+  const sample = [
+    {id: uid(), name:'Carlos Pérez', grade:'10-1', createdAt:new Date().toISOString()},
+    {id: uid(), name:'María Gómez', grade:'9-2', createdAt:new Date().toISOString()},
+    {id: uid(), name:'Juan Rodríguez', grade:'11-3', createdAt:new Date().toISOString()},
+    {id: uid(), name:'Ana Morales', grade:'10-2', createdAt:new Date().toISOString()}
+  ];
+  writeStudents(sample);
+  renderAll();
+}
+
+/* Accessibility: stop camera when page hidden */
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) stopScanner();
+});
+</script>
+</body>
+</html>
