@@ -31,6 +31,7 @@
   <h1>Restaurante Escolar</h1>
   <h3>IE Baldomero Sanín Cano</h3>
   <p class="text-muted">Carga CSV • Códigos QR • Escáner • Asistencia • Impresión • Responsive</p>
+  <button id="enableAudio" class="btn btn-outline-primary btn-sm mb-2">Activar audio</button>
 </header>
 
 <div class="container">
@@ -40,7 +41,7 @@
         <div class="card-body">
           <h5>Importar estudiantes (CSV)</h5>
           <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
-          <small class="text-muted">CSV: encabezados <code>name,grade</code> (name obligatorio)</small>
+          <small class="text-muted">CSV: encabezados <code>name,grade</code></small>
           <button id="importBtn" class="btn btn-primary w-100 mt-2">Cargar CSV</button>
           <hr />
           <h5>Crear estudiante manual</h5>
@@ -98,6 +99,7 @@
 </div>
 
 <script>
+/* ====== STORAGE ====== */
 const STORAGE_STUDENTS = 'rs_students_v1';
 const STORAGE_ATT = 'rs_attendance_v1';
 function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS) || '[]'); }
@@ -105,15 +107,26 @@ function writeStudents(arr){ localStorage.setItem(STORAGE_STUDENTS, JSON.stringi
 function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT) || '{}'); }
 function writeAttendance(obj){ localStorage.setItem(STORAGE_ATT, JSON.stringify(obj)); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-function todayKey(){ return new Date().toISOString().slice(0,10); }
+function todayKey(){ return new Date().toISOString().slice(5,10); } // MM-DD
 
+/* UI refs */
 const studentsList = document.getElementById('studentsList');
 const totalStudentsEl = document.getElementById('totalStudents');
 const attTodayEl = document.getElementById('attToday');
 const attTotalEl = document.getElementById('attTotal');
 document.getElementById('todayDate').textContent = todayKey();
+
+/* ====== VOICE ====== */
+let voiceEnabled = false;
+document.getElementById('enableAudio').addEventListener('click', ()=>{
+  voiceEnabled = true;
+  alert('Audio activado. Cada estudiante registrado se anunciará.');
+});
+
+/* ====== LOAD ====== */
 renderAll();
 
+/* ====== Add manual student ====== */
 document.getElementById('addBtn').addEventListener('click', ()=>{
   const name = document.getElementById('nameInput').value.trim();
   const grade = document.getElementById('gradeInput').value.trim();
@@ -122,8 +135,10 @@ document.getElementById('addBtn').addEventListener('click', ()=>{
   const arr = readStudents(); arr.push(s); writeStudents(arr);
   document.getElementById('nameInput').value=''; document.getElementById('gradeInput').value='';
   renderAll();
+  registerAttendance(s.id, true);
 });
 
+/* ====== CSV Import ====== */
 document.getElementById('importBtn').addEventListener('click', async ()=>{
   const f = document.getElementById('csvFile').files[0];
   if(!f){ alert('Seleccione un archivo CSV'); return; }
@@ -131,13 +146,14 @@ document.getElementById('importBtn').addEventListener('click', async ()=>{
     header: true, skipEmptyLines: true,
     complete(results){
       const rows = results.data;
-      const arr = readStudents(); let added=0;
+      const arr = readStudents();
+      let added=0;
       for(const r of rows){
-        const name = (r.name || r.Nombre || r.nombre || r.NOMBRE || '').trim();
-        const grade = (r.grade || r.Grade || r.grado || r.Grade || '').trim();
+        const name = (r.name||r.Nombre||r.nombre||'').trim();
+        const grade = (r.grade||r.Grade||r.grado||'').trim();
         if(!name) continue;
-        arr.push({ id: uid(), name, grade, createdAt:new Date().toISOString() });
-        added++;
+        const s = { id: uid(), name, grade, createdAt:new Date().toISOString() };
+        arr.push(s); added++;
       }
       writeStudents(arr);
       alert(`Importación finalizada: ${added} estudiantes añadidos.`);
@@ -147,6 +163,7 @@ document.getElementById('importBtn').addEventListener('click', async ()=>{
   });
 });
 
+/* ====== RENDER ====== */
 function renderAll(filter=''){
   const students = readStudents();
   const attendance = readAttendance();
@@ -159,9 +176,9 @@ function renderAll(filter=''){
 
   studentsList.innerHTML = '';
   const q = filter.toLowerCase();
-  students.filter(s => !q || (s.name && s.name.toLowerCase().includes(q)) || (s.grade && s.grade.toLowerCase().includes(q)))
+  students.filter(s => !q || s.name.toLowerCase().includes(q) || (s.grade||'').toLowerCase().includes(q))
     .sort((a,b)=> a.name.localeCompare(b.name))
-    .forEach(s => {
+    .forEach(s=>{
       const item = document.createElement('div');
       item.className = 'list-group-item list-group-item-action d-flex align-items-center';
       item.innerHTML = `
@@ -170,118 +187,30 @@ function renderAll(filter=''){
           <div class="small text-muted">ID: ${s.id}</div>
         </div>
         <div class="ms-3 text-end">
-          <button class="btn btn-sm btn-outline-secondary me-1 btn-qr">QR</button>
           <button class="btn btn-sm btn-outline-success me-1 btn-att">Asistencia</button>
           <button class="btn btn-sm btn-outline-primary me-1 btn-edit">Editar</button>
           <button class="btn btn-sm btn-outline-danger btn-del">Borrar</button>
-          <div class="form-check mt-2">
-            <input class="form-check-input select-for-print" type="checkbox" value="${s.id}" id="sel-${s.id}">
-            <label class="form-check-label small" for="sel-${s.id}">Seleccionar</label>
-          </div>
         </div>
       `;
-      item.querySelector('.btn-del').onclick = ()=>{ if(confirm('¿Borrar estudiante?')) { writeStudents(readStudents().filter(x => x.id !== s.id)); renderAll(); } };
+      item.querySelector('.btn-del').onclick = ()=>{ if(confirm('¿Borrar estudiante?')){ writeStudents(readStudents().filter(x=>x.id!==s.id)); renderAll(); } };
       item.querySelector('.btn-edit').onclick = ()=>{
         const newName = prompt('Nuevo nombre', s.name); if(newName===null) return;
         const newGrade = prompt('Nuevo grado', s.grade||''); if(newName.trim()===''){ alert('Nombre vacío'); return; }
-        writeStudents(readStudents().map(x => x.id===s.id ? {...x, name:newName.trim(), grade:(newGrade||'').trim()} : x));
+        writeStudents(readStudents().map(x=>x.id===s.id?{...x,name:newName.trim(),grade:(newGrade||'').trim()}:x));
         renderAll();
       };
       item.querySelector('.btn-att').onclick = ()=>{ registerAttendance(s.id, true); };
-      item.querySelector('.btn-qr').onclick = ()=>{ showQRModal(s); };
       studentsList.appendChild(item);
     });
 }
 
-document.getElementById('search').addEventListener('input', (e)=> renderAll(e.target.value));
-function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
+/* ====== SEARCH ====== */
+document.getElementById('search').addEventListener('input', e=>renderAll(e.target.value));
 
-function showQRModal(student){
-  const payload = JSON.stringify({ school:'IE_Baldomero', id: student.id });
-  const overlay = document.createElement('div');
-  Object.assign(overlay.style, { position:'fixed', left:0, right:0, top:0, bottom:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 });
-  const box = document.createElement('div');
-  box.style = 'background:#fff; padding:1rem; border-radius:8px; max-width:360px; width:90%; text-align:center;';
-  box.innerHTML = `<h5>${escapeHtml(student.name)}</h5><div id="qrHolder"></div>
-    <p class="small text-muted">${escapeHtml(student.grade||'')}</p>
-    <button class="btn btn-sm btn-primary btn-download">Descargar PNG</button>
-    <button class="btn btn-sm btn-secondary ms-1 btn-close">Cerrar</button>`;
-  overlay.appendChild(box); document.body.appendChild(overlay);
-  const holder = box.querySelector('#qrHolder'); const qrDiv = document.createElement('div'); holder.appendChild(qrDiv);
-  new QRCode(qrDiv, { text: payload, width:200, height:200, correctLevel: QRCode.CorrectLevel.H });
-  box.querySelector('.btn-close').onclick = ()=> { document.body.removeChild(overlay); };
-  box.querySelector('.btn-download').onclick = ()=>{
-    const img = holder.querySelector('img'); if(!img){ alert('No se generó imagen de QR'); return; }
-    const link = document.createElement('a'); link.href = img.src;
-    link.download = `${student.name.replace(/\s+/g,'_')}_qr.png`; link.click();
-  };
-}
-
-function registerAttendance(studentId, fromUI=false){
-  const attendance = readAttendance();
-  const key = todayKey();
-  if(!attendance[key]) attendance[key] = {};
-  if(attendance[key][studentId]){
-    if(fromUI) alert('Asistencia ya registrada hoy para este estudiante.');
-    return false;
-  }
-  attendance[key][studentId] = new Date().toISOString();
-  writeAttendance(attendance);
-  renderAll();
-  const student = readStudents().find(s => s.id === studentId);
-  if(student){
-    const msg = `Estudiante ${student.name} registrado`;
-    const utterance = new SpeechSynthesisUtterance(msg);
-    speechSynthesis.speak(utterance);
-  }
-  if(fromUI) alert('Asistencia registrada.');
-  return true;
-}
-
-function collectSelectedIds(){
-  return Array.from(document.querySelectorAll('.select-for-print:checked')).map(c => c.value);
-}
-function buildPrintLabels(ids){
-  const students = readStudents();
-  const chosen = ids.length ? students.filter(s=> ids.includes(s.id)) : students;
-  const container = document.getElementById('labelsContainer'); container.innerHTML='';
-  for(const s of chosen){
-    const label = document.createElement('div');
-    label.className = 'label';
-    label.style = 'width:180px; padding:6px; border:1px solid #ddd; display:flex; flex-direction:column; align-items:center; margin:6px; background:#fff;';
-    const holder = document.createElement('div'); label.appendChild(holder);
-    const nameEl = document.createElement('div'); nameEl.style='font-size:12px; margin-top:6px; text-align:center;';
-    nameEl.textContent = s.name + ' - ' + (s.grade||''); label.appendChild(nameEl);
-    container.appendChild(label);
-    const tmp = document.createElement('div'); holder.appendChild(tmp);
-    const payload = JSON.stringify({ school:'IE_Baldomero', id: s.id });
-    new QRCode(tmp, { text: payload, width:140, height:140 });
-  }
-  return container;
-}
-
-document.getElementById('printSelected').addEventListener('click', ()=>{
-  const ids = collectSelectedIds(); if(ids.length===0){ alert('No hay estudiantes seleccionados.'); return; }
-  document.getElementById('print-area').style.display='block';
-  buildPrintLabels(ids);
-  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; }, 500);
-});
-
-document.getElementById('printAll').addEventListener('click', ()=>{
-  document.getElementById('print-area').style.display='block';
-  buildPrintLabels([]);
-  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; }, 500);
-});
-
-document.getElementById('clearData').addEventListener('click', ()=>{
-  if(confirm('Borrar estudiantes y asistencias?')){
-    localStorage.removeItem(STORAGE_STUDENTS); localStorage.removeItem(STORAGE_ATT); renderAll();
-  }
-});
-
-let videoStream = null; let scanning = false;
-const video = document.getElementById('video'); const canvas = document.getElementById('canvas'); const ctx = canvas.getContext('2d');
-const scanStatus = document.getElementById('scanStatus');
+/* ====== ESCANER ====== */
+let videoStream = null, scanning = false;
+const video = document.getElementById('video'), canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d');
+const scanStatus=document.getElementById('scanStatus');
 document.getElementById('startScanner').addEventListener('click', startScanner);
 document.getElementById('stopScanner').addEventListener('click', stopScanner);
 
@@ -289,53 +218,103 @@ async function startScanner(){
   if(scanning) return;
   try{
     let stream=null;
-    try{ stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } }); }
-    catch(e){ stream = await navigator.mediaDevices.getUserMedia({ video:true }); }
-    video.srcObject = stream; videoStream=stream;
-    document.getElementById('scanner-area').style.display='block';
-    scanning=true; scanLoop();
-  }catch(err){ alert('No se pudo acceder a la cámara. ' + err.message); }
+    try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"}}}); }
+    catch(e){ stream=await navigator.mediaDevices.getUserMedia({video:true}); }
+    video.srcObject=stream; videoStream=stream;
+    document.getElementById('scanner-area').style.display='block'; scanning=true;
+    scanLoop();
+  }catch(err){ alert('No se pudo acceder a la cámara: '+err.message); }
 }
-
 function stopScanner(){ scanning=false; if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; } document.getElementById('scanner-area').style.display='none'; scanStatus.textContent=''; }
-
-let lastScanTime = 0; const SCAN_COOLDOWN_MS = 1500;
+let lastScanTime=0, SCAN_COOLDOWN_MS=1500;
 function scanLoop(){
   if(!scanning) return;
-  if(video.readyState === video.HAVE_ENOUGH_DATA){
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  if(video.readyState===video.HAVE_ENOUGH_DATA){
+    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
     try{
-      const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
-      const code = jsQR(imgData.data,imgData.width,imgData.height,{ inversionAttempts:"attemptBoth" });
+      const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"attemptBoth"});
       if(code){
-        const now = Date.now();
+        const now=Date.now();
         if(now-lastScanTime>SCAN_COOLDOWN_MS){
           lastScanTime=now;
-          let parsed=null;
-          try{ parsed=JSON.parse(code.data); } catch(e){ parsed=null; }
+          let parsed=null; try{ parsed=JSON.parse(code.data); } catch(e){ parsed=null; }
           if(parsed && parsed.school && parsed.id){
             const ok=registerAttendance(parsed.id);
-            scanStatus.textContent = ok ? `Asistencia registrada: ${parsed.id}` : `Ya registrada hoy: ${parsed.id}`;
-          } else { scanStatus.textContent='QR inválido (payload no reconocido).'; }
+            scanStatus.textContent=ok?`Asistencia registrada: ${parsed.id}`:`Ya registrada hoy: ${parsed.id}`;
+          } else { scanStatus.textContent='QR inválido'; }
         }
-      } else { scanStatus.textContent='Buscando QR...'; }
-    }catch(e){ console.error('scan error', e); }
+      } else scanStatus.textContent='Buscando QR...';
+    }catch(e){ console.error('scan error',e); }
   }
   requestAnimationFrame(scanLoop);
 }
 
-if(readStudents().length === 0){
-  const sample = [
-    {id: uid(), name:'Carlos Pérez', grade:'10-1', createdAt:new Date().toISOString()},
-    {id: uid(), name:'María Gómez', grade:'9-2', createdAt:new Date().toISOString()},
-    {id: uid(), name:'Juan Rodríguez', grade:'11-3', createdAt:new Date().toISOString()},
-    {id: uid(), name:'Ana Morales', grade:'10-2', createdAt:new Date().toISOString()}
-  ];
-  writeStudents(sample); renderAll();
+/* ====== Attendance ====== */
+function registerAttendance(studentId, fromUI=false){
+  const attendance=readAttendance();
+  const key=todayKey();
+  if(!attendance[key]) attendance[key]={};
+  if(attendance[key][studentId]){ if(fromUI) alert('Asistencia ya registrada hoy.'); return false; }
+  attendance[key][studentId]=new Date().toISOString();
+  writeAttendance(attendance);
+  renderAll();
+  if(fromUI && voiceEnabled){
+    const student=readStudents().find(s=>s.id===studentId);
+    if(student){
+      const msg=new SpeechSynthesisUtterance(`Estudiante ${student.name} registrado`);
+      window.speechSynthesis.speak(msg);
+    }
+  }
+  return true;
 }
 
-document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopScanner(); });
+/* ====== PRINT ====== */
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function collectSelectedIds(){ return Array.from(document.querySelectorAll('.select-for-print:checked')).map(c=>c.value); }
+function buildPrintLabels(ids){
+  const students=readStudents();
+  const chosen=ids.length?students.filter(s=>ids.includes(s.id)):students;
+  const container=document.getElementById('labelsContainer');
+  container.innerHTML='';
+  for(const s of chosen){
+    const label=document.createElement('div'); label.className='label'; label.style='width:180px; padding:6px; border:1px solid #ddd; display:flex; flex-direction:column; align-items:center; margin:6px; background:#fff;';
+    const holder=document.createElement('div'); label.appendChild(holder);
+    const nameEl=document.createElement('div'); nameEl.style='font-size:12px; margin-top:6px; text-align:center;';
+    nameEl.textContent=s.name + ' - ' + (s.grade||''); label.appendChild(nameEl); container.appendChild(label);
+    const tmp=document.createElement('div'); holder.appendChild(tmp);
+    const payload=JSON.stringify({school:'IE_Baldomero',id:s.id}); new QRCode(tmp,{text:payload,width:140,height:140});
+  }
+  return container;
+}
+document.getElementById('printSelected').addEventListener('click', ()=>{
+  const ids=collectSelectedIds(); if(ids.length===0){ alert('No hay estudiantes seleccionados.'); return; }
+  const cont=buildPrintLabels(ids); document.getElementById('print-area').style.display='block';
+  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },500);
+});
+document.getElementById('printAll').addEventListener('click', ()=>{
+  buildPrintLabels([]); document.getElementById('print-area').style.display='block';
+  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },500);
+});
+
+/* ====== Clear data ====== */
+document.getElementById('clearData').addEventListener('click', ()=>{
+  if(confirm('Borrar estudiantes y asistencias?')){ localStorage.removeItem(STORAGE_STUDENTS); localStorage.removeItem(STORAGE_ATT); renderAll(); }
+});
+
+/* ====== Sample students for demo ====== */
+if(readStudents().length===0){
+  const sample=[
+    {id:uid(), name:'Carlos Pérez', grade:'10-1', createdAt:new Date().toISOString()},
+    {id:uid(), name:'María Gómez', grade:'9-2', createdAt:new Date().toISOString()},
+    {id:uid(), name:'Juan Rodríguez', grade:'11-3', createdAt:new Date().toISOString()},
+    {id:uid(), name:'Ana Morales', grade:'10-2', createdAt:new Date().toISOString()}
+  ]; writeStudents(sample); renderAll();
+}
+
+/* ====== Accessibility: stop camera when page hidden ====== */
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopScanner(); });
 </script>
 </body>
 </html>
