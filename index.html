@@ -17,17 +17,47 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body { padding:1rem; background:#f4f6f9; }
-    header { display:flex; align-items:center; justify-content:center; background:linear-gradient(90deg,#d32f2f,#1976d2,#388e3c); padding:12px 20px; border-radius:10px; margin-bottom:1rem; color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2);}
-    header img { height:65px; margin-right:15px; }
-    header h2{ margin:0; font-size:1.4rem; } header h3{ margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
+    body { padding: 1rem; background:#f4f6f9; }
 
-    #video { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(90deg, #d32f2f, #1976d2, #388e3c);
+      padding: 12px 20px;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      color: white;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    }
+    header img { height: 65px; margin-right: 15px; }
+    header h2 { margin: 0; font-size: 1.4rem; }
+    header h3 { margin: 0; font-size: 1rem; font-weight: normal; opacity: 0.9; }
+
+    #video { width: 100%; aspect-ratio:1/1; object-fit: cover; border-radius:8px; }
     .flash { animation: flashAnim 0.4s; }
-    @keyframes flashAnim { 0%{background-color:#ffff99;}50%{background-color:#f4f6f9;}100%{background-color:#f4f6f9;} }
-    @media print{ body *{visibility:hidden;} #print-area,#print-area *{visibility:visible;} #print-area{position:absolute;left:0;top:0;width:100%; display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box;} .label{width:32%; margin:1%; text-align:center; page-break-inside:avoid; display:flex; flex-direction:column; align-items:center;} .label-name{margin-top:5px;font-size:12px;text-align:center;} }
-    .label { border:2px dashed #1976d2; padding:6px; margin:6px; display:inline-flex; flex-direction:column; align-items:center; width:30%; border-radius:8px; background:white; }
-    .label .label-name { margin-top:6px; font-size:13px; text-align:center; color:#d32f2f; font-weight:bold; }
+    @keyframes flashAnim {0% {background-color:#ffff99;}50%{background-color:#f4f6f9;}100%{background-color:#f4f6f9;}}
+
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area {
+        position: absolute; left: 0; top: 0; width: 100%;
+        display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box;
+      }
+      .label {
+        width:32%; margin:1%; text-align:center;
+        page-break-inside: avoid;
+        display:flex; flex-direction:column; align-items:center;
+      }
+      .label-name { margin-top:5px; font-size:12px; text-align:center; }
+    }
+
+    .label { border:2px dashed #1976d2; padding:6px; margin:6px;
+      display:inline-flex; flex-direction:column; align-items:center;
+      width:30%; border-radius:8px; background:white; }
+    .label .label-name { margin-top:6px; font-size:13px; text-align:center;
+      color:#d32f2f; font-weight:bold; }
 
     #importBtn { background-color:#388e3c; color:white; font-weight:bold; }
     #printAll { background-color:#1976d2; color:white; }
@@ -36,17 +66,7 @@
     #startScanner { border-color:#1976d2; color:#1976d2; }
     #stopScanner { border-color:#d32f2f; color:#d32f2f; }
 
-    /* Gráfico responsive */
-    #attendanceChart { width:100% !important; max-height:300px; }
-    .toggle-chart { cursor:pointer; user-select:none; color:#1976d2; font-weight:bold; }
-
-    /* Móvil */
-    @media (max-width:768px) {
-      #attendanceChart { max-height:400px; }
-      .card { margin-bottom:1rem; }
-      .btn { font-size:1rem; padding:0.6rem; }
-      .list-group-item { font-size:0.9rem; }
-    }
+    canvas { max-width: 100%; height: auto !important; }
   </style>
 </head>
 <body>
@@ -61,19 +81,21 @@
 
   <div class="container">
     <div class="row g-3">
-      <div class="col-12 col-lg-4">
-        <!-- CSV + QR + Dashboard -->
+      <div class="col-lg-4">
         <div class="card mb-3">
           <div class="card-body">
             <h5>Importar estudiantes (CSV)</h5>
             <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
             <button id="importBtn" class="btn w-100 mt-2">Cargar CSV</button>
+
             <hr/>
+
             <h5>Escáner QR</h5>
             <div id="scanner-controls" class="mb-2">
               <button id="startScanner" class="btn w-100 mb-1">Iniciar escáner</button>
               <button id="stopScanner" class="btn w-100 mb-1">Detener escáner</button>
             </div>
+
             <div id="scanner-area" style="display:none;">
               <video id="video" autoplay playsinline></video>
               <canvas id="canvas" style="display:none;"></canvas>
@@ -85,9 +107,11 @@
                   <option value="all">Todos los grados</option>
                 </select>
               </div>
+
               <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
               <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
             </div>
+
             <hr/>
             <button id="printAll" class="btn w-100">Imprimir todos los QRs</button>
           </div>
@@ -100,35 +124,33 @@
             <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
             <p>Asistencias totales: <strong id="attTotal">0</strong></p>
             <button id="clearData" class="btn btn-sm">Borrar toda la base (local)</button>
-          </div>
-        </div>
 
-        <!-- Gráfico expandible -->
-        <div class="card mt-3">
-          <div class="card-body">
-            <h5 class="toggle-chart" onclick="toggleChart()">📊 Estadística últimos 5 días hábiles</h5>
-            <div id="chartContainer" style="display:none;">
-              <p style="text-align:center; font-weight:bold;">Total asistencias últimos 5 días: <span id="totalLast5Days">0</span></p>
-              <canvas id="attendanceChart" height="200"></canvas>
+            <hr/>
+            <canvas id="attendanceChart"></canvas>
+
+            <hr/>
+            <!-- Bloque colapsable Agregar estudiante -->
+            <button class="btn btn-secondary w-100 mb-2" type="button" id="toggleManual">Agregar estudiante manualmente</button>
+            <div id="manualContainer" style="display:none;">
+              <div class="mb-2">
+                <input id="manualName" type="text" class="form-control mb-1" placeholder="Nombre">
+                <input id="manualGrade" type="text" class="form-control mb-1" placeholder="Grado">
+                <button id="addStudentBtn" class="btn w-100">Agregar estudiante</button>
+              </div>
+              <div id="manualQR" style="margin-top:10px;"></div>
             </div>
           </div>
         </div>
-
       </div>
 
-      <div class="col-12 col-lg-8">
+      <div class="col-lg-8">
         <div id="print-area" style="display:none;"></div>
       </div>
     </div>
   </div>
 
   <script>
-    function toggleChart(){
-      const container=document.getElementById('chartContainer');
-      container.style.display=container.style.display==='none'?'block':'none';
-    }
-
-    // --- Sistema existente ---
+    // ================== STORAGE ==================
     const STORAGE_STUDENTS='rs_students_v1';
     const STORAGE_ATT='rs_attendance_v1';
     function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
@@ -144,28 +166,26 @@
     document.getElementById('todayDate').textContent=todayKey();
     const gradeFilter=document.getElementById('gradeFilter');
 
-    // CSV import
+    // ================== CSV ==================
     document.getElementById('importBtn').addEventListener('click',()=>{
       const f=document.getElementById('csvFile').files[0];
       if(!f){ alert('Seleccione CSV'); return; }
-      Papa.parse(f,{ header:true, skipEmptyLines:true,
-        complete(results){
-          const arr=readStudents(); let added=0;
-          for(const r of results.data){
-            const name=(r.name||'').trim();
-            const grade=(r.grade||'').trim();
-            if(!name) continue;
-            arr.push({id:uid(), name, grade, createdAt:new Date().toISOString()});
-            added++;
-          }
-          writeStudents(arr);
-          alert(`Importación finalizada: ${added} estudiantes añadidos.`);
-          renderDashboard(); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
+      Papa.parse(f,{header:true, skipEmptyLines:true, complete(results){
+        const arr=readStudents(); let added=0;
+        for(const r of results.data){
+          const name=(r.name||'').trim();
+          const grade=(r.grade||'').trim();
+          if(!name) continue;
+          arr.push({id:uid(), name, grade, createdAt:new Date().toISOString()});
+          added++;
         }
-      });
+        writeStudents(arr);
+        alert(`Importación finalizada: ${added} estudiantes añadidos.`);
+        renderDashboard(); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
+      }});
     });
 
-    // Attendance
+    // ================== ATTENDANCE ==================
     function registerAttendanceQR(name, grade){
       const students=readStudents();
       const student=students.find(s=>s.name===name&&s.grade===grade);
@@ -179,7 +199,7 @@
       return student.name;
     }
 
-    // Dashboard
+    // ================== DASHBOARD ==================
     function renderDashboard(){
       const students=readStudents();
       const att=readAttendance(); const today=todayKey();
@@ -187,20 +207,9 @@
       attTodayEl.textContent=att[today]?Object.keys(att[today]).length:0;
       attTotalEl.textContent=Object.values(att).reduce((s,o)=>s+Object.keys(o).length,0);
     }
+    renderDashboard();
 
-    // Filter grados
-    function updateGradeFilter(){
-      const students=readStudents();
-      const unique=[...new Set(students.map(s=>s.grade))].sort();
-      gradeFilter.innerHTML='<option value="all">Todos los grados</option>';
-      unique.forEach(g=>{
-        const opt=document.createElement('option');
-        opt.value=g; opt.textContent=g;
-        gradeFilter.appendChild(opt);
-      });
-    }
-
-    // List today con filtro
+    // ================== LIST TODAY ==================
     function renderTodayList(){
       const att=readAttendance();
       const today=todayKey();
@@ -224,7 +233,7 @@
     }
     gradeFilter.addEventListener('change',renderTodayList);
 
-    // --- Escáner existente ---
+    // ================== SCANNER ==================
     let videoStream=null, scanning=false;
     const video=document.getElementById('video');
     const canvas=document.getElementById('canvas');
@@ -264,7 +273,7 @@
           if(now-lastScan>1500){
             lastScan=now; let parsed=null;
             try{ parsed=JSON.parse(code.data); }catch(e){ parsed=null; }
-            if(parsed && parsed.name && parsed.grade){
+            if(parsed&&parsed.name&&parsed.grade){
               const res=registerAttendanceQR(parsed.name,parsed.grade);
               if(res==='notfound'){ scanStatus.textContent='Estudiante no encontrado'; speak('Estudiante no encontrado'); }
               else if(res==='already'){ scanStatus.textContent='Ya registrado'; speak('Estudiante ya registrado'); }
@@ -277,7 +286,7 @@
     }
     function speak(t){ const u=new SpeechSynthesisUtterance(t); window.speechSynthesis.speak(u); }
 
-    // --- Print all QRs ---
+    // ================== PRINT QRS ==================
     function buildPrintLabels(){
       const container=document.getElementById('print-area');
       container.innerHTML=''; container.style.display='block';
@@ -296,7 +305,7 @@
       setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },500);
     });
 
-    // --- Export PDF ---
+    // ================== EXPORT PDF ==================
     document.getElementById('exportPDF').addEventListener('click',()=>{
       const att=readAttendance(); const today=todayKey();
       if(!att[today]){ alert('No hay registros hoy'); return; }
@@ -315,7 +324,7 @@
       doc.save(`Estudiantes_${today}.pdf`);
     });
 
-    // --- Clear data ---
+    // ================== CLEAR DATA ==================
     document.getElementById('clearData').addEventListener('click',()=>{
       if(confirm('Borrar estudiantes y asistencias?')){
         localStorage.removeItem(STORAGE_STUDENTS);
@@ -324,7 +333,41 @@
       }
     });
 
-    // --- Demo ---
+    // ================== UPDATE GRADE FILTER ==================
+    function updateGradeFilter(){
+      const students=readStudents();
+      const unique=[...new Set(students.map(s=>s.grade))].sort();
+      gradeFilter.innerHTML='<option value="all">Todos los grados</option>';
+      unique.forEach(g=>{
+        const opt=document.createElement('option');
+        opt.value=g; opt.textContent=g;
+        gradeFilter.appendChild(opt);
+      });
+    }
+    updateGradeFilter();
+
+    // ================== AGREGAR ESTUDIANTE MANUAL ==================
+    document.getElementById('toggleManual').addEventListener('click',()=>{
+      const c=document.getElementById('manualContainer');
+      c.style.display=c.style.display==='none'?'block':'none';
+    });
+
+    document.getElementById('addStudentBtn').addEventListener('click',()=>{
+      const name=document.getElementById('manualName').value.trim();
+      const grade=document.getElementById('manualGrade').value.trim();
+      if(!name||!grade){ alert('Ingrese nombre y grado'); return; }
+      const students=readStudents();
+      const newStudent={id:uid(), name, grade, createdAt:new Date().toISOString()};
+      students.push(newStudent); writeStudents(students);
+      alert(`Estudiante ${name} agregado correctamente.`);
+      updateGradeFilter(); renderTodayList(); renderAttendanceChart();
+      const holder=document.getElementById('manualQR');
+      holder.innerHTML='';
+      new QRCode(holder,{text:JSON.stringify({name,grade}), width:140, height:140});
+      document.getElementById('manualName').value=''; document.getElementById('manualGrade').value='';
+    });
+
+    // ================== DEMO ==================
     if(readStudents().length===0){
       const sample=[
         {id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
@@ -332,45 +375,34 @@
         {id:uid(),name:'Juan Rodríguez',grade:'11-3',createdAt:new Date().toISOString()},
         {id:uid(),name:'Ana Morales',grade:'10-2',createdAt:new Date().toISOString()}
       ];
-      writeStudents(sample); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
+      writeStudents(sample); updateGradeFilter();
     }
 
-    // --- Gráfico últimos 5 días hábiles ---
-    function getLast5SchoolDays(){
-      const res=[]; let dt=new Date(); 
-      while(res.length<5){
-        const day=dt.getDay(); // 0=dom,6=sab
-        if(day!==0 && day!==6){ res.unshift(dt.toISOString().slice(0,10)); }
-        dt.setDate(dt.getDate()-1);
-      }
-      return res;
-    }
-
+    // ================== GRAFICA ==================
+    const ctxChart=document.getElementById('attendanceChart').getContext('2d');
     let attendanceChart=null;
     function renderAttendanceChart(){
-      const last5=getLast5SchoolDays();
       const att=readAttendance(); const students=readStudents();
-      const data=last5.map(d=>{
-        if(!att[d]) return 0;
-        return Object.keys(att[d]).length;
-      });
-      document.getElementById('totalLast5Days').textContent=data.reduce((a,b)=>a+b,0);
-
-      const labels=last5.map(d=>{
-        const dt=new Date(d+'T00:00:00');
-        return dt.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short'});
-      });
-
-      const ctxChart=document.getElementById('attendanceChart').getContext('2d');
+      // últimos 5 días hábiles (lunes-viernes)
+      const today=new Date(); let labels=[], data=[];
+      let count=0, date=today; while(labels.length<5){
+        const day=date.getDay();
+        if(day!==0 && day!==6){ // lunes-viernes
+          const key=date.toISOString().slice(0,10);
+          labels.unshift(key.split('-').reverse().join('-')); // dd-mm-yyyy
+          data.unshift(att[key]?Object.keys(att[key]).length:0);
+        }
+        date.setDate(date.getDate()-1);
+        count++; if(count>14) break; // seguridad
+      }
       if(attendanceChart) attendanceChart.destroy();
       attendanceChart=new Chart(ctxChart,{
         type:'bar',
-        data:{ labels, datasets:[{ label:'Asistencias', data, backgroundColor:'#1976d2' }] },
-        options:{ responsive:true, plugins:{ legend:{display:false} } }
+        data:{ labels, datasets:[{label:'Asistencias',data,backgroundColor:'#1976d2'}] },
+        options:{ responsive:true, scales:{ y:{ beginAtZero:true, precision:0 } } }
       });
     }
-
-    renderDashboard(); renderTodayList(); renderAttendanceChart();
+    renderAttendanceChart();
   </script>
 </body>
 </html>
