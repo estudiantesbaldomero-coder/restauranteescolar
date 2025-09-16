@@ -14,7 +14,6 @@
   <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body { padding: 1rem; background:#f4f6f9; }
@@ -51,6 +50,9 @@
     #clearData { background-color:#d32f2f; color:white; }
     #startScanner { border-color:#1976d2; color:#1976d2; }
     #stopScanner { border-color:#d32f2f; color:#d32f2f; }
+
+    /* Manual student toggle */
+    #manualContainer { display:none; margin-top:10px; }
   </style>
 </head>
 <body>
@@ -66,6 +68,7 @@
   <div class="container">
     <div class="row g-3">
       <div class="col-lg-4">
+
         <!-- CSV Import y Scanner -->
         <div class="card mb-3">
           <div class="card-body">
@@ -108,7 +111,8 @@
             <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
             <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
             <p>Asistencias totales: <strong id="attTotal">0</strong></p>
-            <button id="clearData" class="btn btn-sm">Borrar toda la base (local)</button>
+            <div id="attendanceStats"></div>
+            <button id="clearData" class="btn btn-sm mt-2">Borrar toda la base (local)</button>
           </div>
         </div>
 
@@ -116,13 +120,11 @@
         <div class="card mt-3">
           <div class="card-body">
             <button id="toggleManual" class="btn btn-sm btn-info w-100 mb-2">Agregar estudiante manual</button>
-            <div id="manualContainer" style="display:none;">
-              <div class="mb-2">
-                <input type="text" id="manualName" class="form-control mb-1" placeholder="Nombre completo">
-                <input type="text" id="manualGrade" class="form-control" placeholder="Grado">
-              </div>
-              <button id="addStudentBtn" class="btn btn-success w-100 mb-2">Agregar estudiante</button>
-              <div id="manualQR" class="text-center mb-2" style="padding:10px;"></div>
+            <div id="manualContainer">
+              <input type="text" id="manualName" class="form-control mb-1" placeholder="Nombre completo">
+              <input type="text" id="manualGrade" class="form-control mb-1" placeholder="Grado">
+              <button id="addStudentBtn" class="btn btn-success w-100 mb-1">Agregar estudiante</button>
+              <div id="manualQR" class="text-center mb-1" style="padding:10px;"></div>
               <button id="exportCSVBtn" class="btn btn-secondary w-100">Exportar CSV actualizado</button>
             </div>
           </div>
@@ -131,13 +133,11 @@
       </div>
 
       <div class="col-lg-8">
-        <canvas id="attendanceChart" style="width:100%;max-height:350px;"></canvas>
         <div id="print-area" style="display:none;"></div>
       </div>
     </div>
   </div>
 
-  <!-- ================= SCRIPT ================= -->
   <script>
     // ------------------ STORAGE ------------------
     const STORAGE_STUDENTS='rs_students_v1';
@@ -170,7 +170,7 @@
         }
         writeStudents(arr);
         alert(`Importación finalizada: ${added} estudiantes añadidos.`);
-        renderDashboard(); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
+        renderDashboard(); updateGradeFilter(); renderTodayList();
       }});
     });
 
@@ -184,7 +184,7 @@
       if(att[key][student.id]) return 'already';
       att[key][student.id]=new Date().toISOString();
       writeAttendance(att);
-      renderDashboard(); renderTodayList(); renderAttendanceChart();
+      renderDashboard(); renderTodayList();
       return student.name;
     }
 
@@ -200,32 +200,39 @@
       const students=readStudents();
       const unique=[...new Set(students.map(s=>s.grade))].sort();
       gradeFilter.innerHTML='<option value="all">Todos los grados</option>';
-      unique.forEach(g=>{ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; gradeFilter.appendChild(opt); });
+      unique.forEach(g=>{
+        const opt=document.createElement('option'); opt.value=g; opt.textContent=g;
+        gradeFilter.appendChild(opt);
+      });
     }
 
     function renderTodayList(){
-      const att=readAttendance(); const today=todayKey();
-      const ul=document.getElementById('todayStudents'); ul.innerHTML='';
+      const att=readAttendance();
+      const today=todayKey();
+      const ul=document.getElementById('todayStudents');
+      ul.innerHTML='';
       if(att[today]){
-        const students=readStudents(); let index=1;
+        const students=readStudents();
+        let index=1;
         Object.keys(att[today]).forEach(id=>{
           const s=students.find(st=>st.id===id);
           if(s&&(gradeFilter.value==="all"||gradeFilter.value===s.grade)){
-            const li=document.createElement('li'); li.className='list-group-item flash';
-            li.textContent=`${index}. ${s.name} - ${s.grade}`; ul.appendChild(li); index++;
+            const li=document.createElement('li');
+            li.className='list-group-item flash';
+            li.textContent=`${index}. ${s.name} - ${s.grade}`;
+            ul.appendChild(li); index++;
             setTimeout(()=>li.classList.remove('flash'),400);
           }
         });
       }
     }
-    gradeFilter.addEventListener('change',renderTodayList);
 
     // ---------------- SCANNER ----------------
     let videoStream=null, scanning=false;
     const video=document.getElementById('video');
-    const canvas=document.getElementById('canvas'); const ctx=canvas.getContext('2d');
+    const canvas=document.getElementById('canvas');
+    const ctx=canvas.getContext('2d');
     const scanStatus=document.getElementById('scanStatus');
-
     document.getElementById('startScanner').addEventListener('click',startScanner);
     document.getElementById('stopScanner').addEventListener('click',stopScanner);
 
@@ -236,14 +243,11 @@
         try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"}}}); }
         catch(e){ stream=await navigator.mediaDevices.getUserMedia({video:true}); }
         video.srcObject=stream; videoStream=stream; scanning=true;
-        document.getElementById('scanner-area').style.display='block'; scanLoop();
+        document.getElementById('scanner-area').style.display='block';
+        scanLoop();
       }catch(err){ alert('No se pudo acceder a la cámara: '+err.message); }
     }
-    function stopScanner(){
-      scanning=false;
-      if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; }
-      document.getElementById('scanner-area').style.display='none'; scanStatus.textContent='';
-    }
+    function stopScanner(){ scanning=false; if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; } document.getElementById('scanner-area').style.display='none'; scanStatus.textContent=''; }
     video.addEventListener('loadedmetadata',()=>{ video.style.height=video.offsetWidth+'px'; });
 
     let lastScan=0;
@@ -314,7 +318,7 @@
       if(confirm('Borrar estudiantes y asistencias?')){
         localStorage.removeItem(STORAGE_STUDENTS);
         localStorage.removeItem(STORAGE_ATT);
-        renderDashboard(); renderTodayList(); updateGradeFilter(); renderAttendanceChart();
+        renderDashboard(); renderTodayList(); updateGradeFilter();
       }
     });
 
@@ -334,12 +338,13 @@
       writeStudents(arr);
 
       alert('Estudiante agregado!');
-      updateGradeFilter(); renderDashboard(); renderTodayList(); renderAttendanceChart();
+      updateGradeFilter(); renderDashboard(); renderTodayList();
 
-      const container=document.getElementById('manualQR'); container.style.display='block'; container.innerHTML='';
+      // Crear QR
+      const container=document.getElementById('manualQR'); container.innerHTML='';
       const qrDiv=document.createElement('div'); container.appendChild(qrDiv);
       const payload=JSON.stringify({name,grade});
-      setTimeout(()=>{ new QRCode(qrDiv,{text:payload,width:140,height:140}); },100);
+      new QRCode(qrDiv,{text:payload,width:140,height:140});
     });
 
     document.getElementById('exportCSVBtn').addEventListener('click',()=>{
@@ -351,30 +356,7 @@
       URL.revokeObjectURL(url);
     });
 
-    // ---------------- ATTENDANCE CHART ----------------
-    let attendanceChart=null;
-    function renderAttendanceChart(){
-      const att=readAttendance(); const students=readStudents();
-      const days=[]; const counts=[];
-      const now=new Date();
-      let added=0, i=0;
-      while(added<5 && i<10){
-        const d=new Date(); d.setDate(now.getDate()-i); i++;
-        const wd=d.getDay();
-        if(wd===0||wd===6) continue;
-        const key=d.toISOString().slice(0,10);
-        days.unshift(d.toLocaleDateString('es-ES',{weekday:'long',day:'2-digit',month:'short'}));
-        const count=att[key]?Object.keys(att[key]).length:0;
-        counts.unshift(count);
-        added++;
-      }
-      const ctx=document.getElementById('attendanceChart').getContext('2d');
-      if(attendanceChart) attendanceChart.destroy();
-      attendanceChart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'Asistencias',data:counts,backgroundColor:'#1976d2'}]},options:{responsive:true,plugins:{legend:{display:false}}}});
-    }
-    renderAttendanceChart();
-
-    // ---------------- DEMO ----------------
+    // ---------------- INITIAL DEMO ----------------
     if(readStudents().length===0){
       const sample=[
         {id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
@@ -389,3 +371,4 @@
   </script>
 </body>
 </html>
+
