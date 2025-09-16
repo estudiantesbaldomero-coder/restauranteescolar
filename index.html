@@ -35,6 +35,10 @@
     #clearData { background-color:#d32f2f; color:white; }
     #startScanner { border-color:#1976d2; color:#1976d2; }
     #stopScanner { border-color:#d32f2f; color:#d32f2f; }
+
+    /* Mejora gráfico móvil */
+    #attendanceChart { width:100% !important; max-height:300px; }
+    .toggle-chart { cursor:pointer; user-select:none; color:#1976d2; font-weight:bold; }
   </style>
 </head>
 <body>
@@ -94,14 +98,17 @@
           </div>
         </div>
 
-        <!-- Nueva sección de Estadística últimos 5 días hábiles -->
+        <!-- Gráfico móvil expandible -->
         <div class="card mt-3">
           <div class="card-body">
-            <h5>Estadística últimos 5 días hábiles</h5>
-            <canvas id="attendanceChart" height="100"></canvas>
-            <p>Total asistencias últimos 5 días: <span id="totalLast5Days">0</span></p>
+            <h5 class="toggle-chart" onclick="toggleChart()">📊 Estadística últimos 5 días hábiles</h5>
+            <div id="chartContainer" style="display:none;">
+              <p style="text-align:center; font-weight:bold;">Total asistencias últimos 5 días: <span id="totalLast5Days">0</span></p>
+              <canvas id="attendanceChart" height="200"></canvas>
+            </div>
           </div>
         </div>
+
       </div>
 
       <div class="col-lg-8">
@@ -111,6 +118,11 @@
   </div>
 
   <script>
+    function toggleChart(){
+      const container=document.getElementById('chartContainer');
+      container.style.display=container.style.display==='none'?'block':'none';
+    }
+
     // --- Sistema existente ---
     const STORAGE_STUDENTS='rs_students_v1';
     const STORAGE_ATT='rs_attendance_v1';
@@ -144,7 +156,7 @@
           }
           writeStudents(arr);
           alert(`Importación finalizada: ${added} estudiantes añadidos.`);
-          renderDashboard(); updateGradeFilter(); renderAttendanceChart(); renderTodayList();
+          renderDashboard(); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
         }
       });
     });
@@ -163,6 +175,7 @@
       return student.name;
     }
 
+    // --- Dashboard ---
     function renderDashboard(){
       const students=readStudents();
       const att=readAttendance(); const today=todayKey();
@@ -170,8 +183,8 @@
       attTodayEl.textContent=att[today]?Object.keys(att[today]).length:0;
       attTotalEl.textContent=Object.values(att).reduce((s,o)=>s+Object.keys(o).length,0);
     }
-    renderDashboard();
 
+    // --- Filter grados ---
     function updateGradeFilter(){
       const students=readStudents();
       const unique=[...new Set(students.map(s=>s.grade))].sort();
@@ -182,7 +195,6 @@
         gradeFilter.appendChild(opt);
       });
     }
-    updateGradeFilter();
 
     function renderTodayList(){
       const att=readAttendance();
@@ -207,148 +219,44 @@
         });
       }
     }
-    renderTodayList();
+
     gradeFilter.addEventListener('change',renderTodayList);
 
-    // --- Attendance últimos 5 días ---
-    function getLast5Weekdays(){
-      const days=[];
-      let date=new Date();
-      while(days.length<5){
-        date.setDate(date.getDate()-1);
-        const day=date.getDay();
-        if(day>=1 && day<=5) days.unshift(new Date(date));
-      }
-      return days;
-    }
-
+    // --- Gráfico últimos 5 días ---
+    let attendanceChart=null;
     function renderAttendanceChart(){
-      const students=readStudents();
-      const att=readAttendance();
-      const last5=getLast5Weekdays();
-      const labels=last5.map(d=>d.toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'short'}));
-      const data=last5.map(d=>{
-        const key=d.toISOString().slice(0,10);
-        return att[key]?Object.keys(att[key]).length:0;
-      });
-      document.getElementById('totalLast5Days').textContent=data.reduce((a,b)=>a+b,0);
+      const att=readAttendance(); const students=readStudents();
+      const last5Days=[];
+      const counts=[];
+      const today=new Date();
+      let added=0, d=today;
+      while(added<5){
+        if(d.getDay()!==0 && d.getDay()!==6){ // lunes-viernes
+          const key=d.toISOString().slice(0,10);
+          last5Days.unshift(key); // orden correcto
+          const count=att[key]?Object.keys(att[key]).length:0;
+          counts.unshift(count);
+          added++;
+        }
+        d.setDate(d.getDate()-1);
+      }
       const ctx=document.getElementById('attendanceChart').getContext('2d');
-      if(window.last5Chart) window.last5Chart.destroy();
-      window.last5Chart=new Chart(ctx,{
+      document.getElementById('totalLast5Days').textContent=counts.reduce((a,b)=>a+b,0);
+      if(attendanceChart) attendanceChart.destroy();
+      attendanceChart=new Chart(ctx,{
         type:'bar',
         data:{
-          labels:labels,
-          datasets:[{
-            label:'Asistencias',
-            data:data,
-            backgroundColor:'rgba(54,162,235,0.6)',
-            borderColor:'rgba(54,162,235,1)',
-            borderWidth:1
-          }]
+          labels:last5Days.map(d=>new Date(d).toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short'})),
+          datasets:[{label:'Asistencias', data:counts, backgroundColor:'#1976d2'}]
         },
-        options:{scales:{y:{beginAtZero:true}}}
+        options:{responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true}}}
       });
     }
-    renderAttendanceChart();
 
-    // --- PDF export actualizado ---
-    document.getElementById('exportPDF').addEventListener('click',()=>{
-      const att=readAttendance(); const today=todayKey();
-      if(!att[today]){ alert('No hay registros hoy'); return; }
-      const students=readStudents(); const { jsPDF }=window.jspdf; const doc=new jsPDF();
-      const last5Total=document.getElementById('totalLast5Days').textContent;
-      doc.setFontSize(14); doc.text(`Estudiantes registrados - ${today}`,14,20);
-      doc.setFontSize(12); doc.text(`Total asistencias últimos 5 días: ${last5Total}`,14,28);
-      const tableCol=["N°","Nombre","Grado","Fecha"];
-      const tableRows=[]; let index=1;
-      Object.keys(att[today]).forEach(id=>{
-        const s=students.find(st=>st.id===id);
-        if(s){
-          if(gradeFilter.value==="all" || gradeFilter.value===s.grade){
-            const dateReg=new Date(att[today][id]).toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
-            tableRows.push([index++,s.name,s.grade,dateReg]);
-          }
-        }
-      });
-      doc.autoTable({ head:[tableCol], body:tableRows, startY:35, theme:'grid' });
-      doc.save(`Estudiantes_${today}.pdf`);
-    });
+    // --- Inicializar ---
+    renderDashboard(); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
 
-    // --- Scanner y Print QRs se mantiene igual ---
-    let videoStream=null, scanning=false;
-    const video=document.getElementById('video');
-    const canvas=document.getElementById('canvas');
-    const ctx=canvas.getContext('2d');
-    const scanStatus=document.getElementById('scanStatus');
-    document.getElementById('startScanner').addEventListener('click',startScanner);
-    document.getElementById('stopScanner').addEventListener('click',stopScanner);
-    async function startScanner(){
-      if(scanning) return;
-      try{
-        let stream=null;
-        try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"}}}); }
-        catch(e){ stream=await navigator.mediaDevices.getUserMedia({video:true}); }
-        video.srcObject=stream; videoStream=stream; scanning=true;
-        document.getElementById('scanner-area').style.display='block';
-        scanLoop();
-      }catch(err){ alert('No se pudo acceder a la cámara: '+err.message); }
-    }
-    function stopScanner(){ scanning=false; if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; } document.getElementById('scanner-area').style.display='none'; scanStatus.textContent=''; }
-    video.addEventListener('loadedmetadata',()=>{ video.style.height=video.offsetWidth+'px'; });
-
-    let lastScan=0;
-    function scanLoop(){
-      if(!scanning) return;
-      if(video.readyState===video.HAVE_ENOUGH_DATA){
-        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-        ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"attemptBoth"});
-        if(code){
-          const now=Date.now();
-          if(now-lastScan>1500){
-            lastScan=now; let parsed=null;
-            try{ parsed=JSON.parse(code.data); }catch(e){ parsed=null; }
-            if(parsed&&parsed.name&&parsed.grade){
-              const res=registerAttendanceQR(parsed.name,parsed.grade);
-              if(res==='notfound'){ scanStatus.textContent='Estudiante no encontrado'; speak('Estudiante no encontrado'); }
-              else if(res==='already'){ scanStatus.textContent='Ya registrado'; speak('Estudiante ya registrado'); }
-              else{ scanStatus.textContent=`Registrado: ${res}`; speak(`Estudiante registrado: ${res}`); }
-            } else { scanStatus.textContent='QR inválido'; speak('QR inválido'); }
-          }
-        } else { scanStatus.textContent='Buscando QR...'; }
-      }
-      requestAnimationFrame(scanLoop);
-    }
-    function speak(t){ const u=new SpeechSynthesisUtterance(t); window.speechSynthesis.speak(u); }
-
-    function buildPrintLabels(){
-      const container=document.getElementById('print-area');
-      container.innerHTML=''; container.style.display='block';
-      const students=readStudents();
-      for(const s of students){
-        const label=document.createElement('div'); label.className='label';
-        const holder=document.createElement('div'); label.appendChild(holder);
-        const nameEl=document.createElement('div'); nameEl.className='label-name'; nameEl.textContent=`${s.name} - ${s.grade}`;
-        label.appendChild(nameEl); container.appendChild(label);
-        const payload=JSON.stringify({name:s.name,grade:s.grade});
-        new QRCode(holder,{text:payload,width:140,height:140});
-      }
-    }
-    document.getElementById('printAll').addEventListener('click',()=>{
-      buildPrintLabels();
-      setTimeout(()=>{ window.print(); container.style.display='none'; },500);
-    });
-
-    document.getElementById('clearData').addEventListener('click',()=>{
-      if(confirm('Borrar estudiantes y asistencias?')){
-        localStorage.removeItem(STORAGE_STUDENTS);
-        localStorage.removeItem(STORAGE_ATT);
-        renderDashboard(); renderTodayList(); updateGradeFilter(); renderAttendanceChart();
-      }
-    });
-
-    // --- Demo inicial ---
+    // --- Demo ---
     if(readStudents().length===0){
       const sample=[
         {id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
@@ -356,7 +264,7 @@
         {id:uid(),name:'Juan Rodríguez',grade:'11-3',createdAt:new Date().toISOString()},
         {id:uid(),name:'Ana Morales',grade:'10-2',createdAt:new Date().toISOString()}
       ];
-      writeStudents(sample); updateGradeFilter();
+      writeStudents(sample); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
     }
   </script>
 </body>
