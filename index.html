@@ -17,7 +17,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body { padding: 1rem; background:#f4f6f9; }
+    body { padding:1rem; background:#f4f6f9; }
     header { display:flex; align-items:center; justify-content:center; background:linear-gradient(90deg,#d32f2f,#1976d2,#388e3c); padding:12px 20px; border-radius:10px; margin-bottom:1rem; color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2);}
     header img { height:65px; margin-right:15px; }
     header h2{ margin:0; font-size:1.4rem; } header h3{ margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
@@ -36,9 +36,17 @@
     #startScanner { border-color:#1976d2; color:#1976d2; }
     #stopScanner { border-color:#d32f2f; color:#d32f2f; }
 
-    /* Mejora gráfico móvil */
+    /* Gráfico responsive */
     #attendanceChart { width:100% !important; max-height:300px; }
     .toggle-chart { cursor:pointer; user-select:none; color:#1976d2; font-weight:bold; }
+
+    /* Móvil */
+    @media (max-width:768px) {
+      #attendanceChart { max-height:400px; }
+      .card { margin-bottom:1rem; }
+      .btn { font-size:1rem; padding:0.6rem; }
+      .list-group-item { font-size:0.9rem; }
+    }
   </style>
 </head>
 <body>
@@ -53,20 +61,19 @@
 
   <div class="container">
     <div class="row g-3">
-      <div class="col-lg-4">
+      <div class="col-12 col-lg-4">
+        <!-- CSV + QR + Dashboard -->
         <div class="card mb-3">
           <div class="card-body">
             <h5>Importar estudiantes (CSV)</h5>
             <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
             <button id="importBtn" class="btn w-100 mt-2">Cargar CSV</button>
             <hr/>
-
             <h5>Escáner QR</h5>
             <div id="scanner-controls" class="mb-2">
               <button id="startScanner" class="btn w-100 mb-1">Iniciar escáner</button>
               <button id="stopScanner" class="btn w-100 mb-1">Detener escáner</button>
             </div>
-
             <div id="scanner-area" style="display:none;">
               <video id="video" autoplay playsinline></video>
               <canvas id="canvas" style="display:none;"></canvas>
@@ -78,9 +85,7 @@
                   <option value="all">Todos los grados</option>
                 </select>
               </div>
-
               <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
-
               <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
             </div>
             <hr/>
@@ -98,7 +103,7 @@
           </div>
         </div>
 
-        <!-- Gráfico móvil expandible -->
+        <!-- Gráfico expandible -->
         <div class="card mt-3">
           <div class="card-body">
             <h5 class="toggle-chart" onclick="toggleChart()">📊 Estadística últimos 5 días hábiles</h5>
@@ -111,7 +116,7 @@
 
       </div>
 
-      <div class="col-lg-8">
+      <div class="col-12 col-lg-8">
         <div id="print-area" style="display:none;"></div>
       </div>
     </div>
@@ -139,12 +144,11 @@
     document.getElementById('todayDate').textContent=todayKey();
     const gradeFilter=document.getElementById('gradeFilter');
 
-    // --- CSV import ---
+    // CSV import
     document.getElementById('importBtn').addEventListener('click',()=>{
       const f=document.getElementById('csvFile').files[0];
       if(!f){ alert('Seleccione CSV'); return; }
-      Papa.parse(f,{
-        header:true, skipEmptyLines:true,
+      Papa.parse(f,{ header:true, skipEmptyLines:true,
         complete(results){
           const arr=readStudents(); let added=0;
           for(const r of results.data){
@@ -161,7 +165,7 @@
       });
     });
 
-    // --- Attendance ---
+    // Attendance
     function registerAttendanceQR(name, grade){
       const students=readStudents();
       const student=students.find(s=>s.name===name&&s.grade===grade);
@@ -175,7 +179,7 @@
       return student.name;
     }
 
-    // --- Dashboard ---
+    // Dashboard
     function renderDashboard(){
       const students=readStudents();
       const att=readAttendance(); const today=todayKey();
@@ -184,7 +188,7 @@
       attTotalEl.textContent=Object.values(att).reduce((s,o)=>s+Object.keys(o).length,0);
     }
 
-    // --- Filter grados ---
+    // Filter grados
     function updateGradeFilter(){
       const students=readStudents();
       const unique=[...new Set(students.map(s=>s.grade))].sort();
@@ -222,18 +226,16 @@
 
     gradeFilter.addEventListener('change',renderTodayList);
 
-    // --- Gráfico últimos 5 días ---
+    // Gráfico últimos 5 días
     let attendanceChart=null;
     function renderAttendanceChart(){
       const att=readAttendance(); const students=readStudents();
-      const last5Days=[];
-      const counts=[];
-      const today=new Date();
-      let added=0, d=today;
+      const last5Days=[]; const counts=[];
+      const today=new Date(); let added=0, d=today;
       while(added<5){
-        if(d.getDay()!==0 && d.getDay()!==6){ // lunes-viernes
+        if(d.getDay()!==0 && d.getDay()!==6){
           const key=d.toISOString().slice(0,10);
-          last5Days.unshift(key); // orden correcto
+          last5Days.unshift(key);
           const count=att[key]?Object.keys(att[key]).length:0;
           counts.unshift(count);
           added++;
@@ -245,18 +247,17 @@
       if(attendanceChart) attendanceChart.destroy();
       attendanceChart=new Chart(ctx,{
         type:'bar',
-        data:{
-          labels:last5Days.map(d=>new Date(d).toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short'})),
-          datasets:[{label:'Asistencias', data:counts, backgroundColor:'#1976d2'}]
+        data:{ labels:last5Days.map(d=>new Date(d).toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short'})),
+               datasets:[{label:'Asistencias', data:counts, backgroundColor:'#1976d2'}]
         },
         options:{responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true}}}
       });
     }
 
-    // --- Inicializar ---
+    // Inicializar
     renderDashboard(); updateGradeFilter(); renderTodayList(); renderAttendanceChart();
 
-    // --- Demo ---
+    // Demo
     if(readStudents().length===0){
       const sample=[
         {id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
@@ -269,3 +270,4 @@
   </script>
 </body>
 </html>
+
