@@ -19,61 +19,48 @@
   <style>
     body { padding: 1rem; background:#f4f6f9; }
 
-    /* Encabezado */
     header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(90deg, #d32f2f, #1976d2, #388e3c);
-      padding: 12px 20px;
-      border-radius: 10px;
-      margin-bottom: 1rem;
-      color: white;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+      display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(90deg,#d32f2f,#1976d2,#388e3c);
+      padding:12px 20px; border-radius:10px; margin-bottom:1rem;
+      color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2);
     }
-    header img { height: 65px; margin-right: 15px; }
-    header h2 { margin: 0; font-size: 1.4rem; }
-    header h3 { margin: 0; font-size: 1rem; font-weight: normal; opacity: 0.9; }
+    header img{ height:65px; margin-right:15px; }
+    header h2{ margin:0; font-size:1.4rem; }
+    header h3{ margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
 
-    /* Video escáner */
-    #video { width: 100%; aspect-ratio:1/1; object-fit: cover; border-radius:8px; }
-
-    .flash { animation: flashAnim 0.4s; }
-    @keyframes flashAnim {
-      0% { background-color: #ffff99; }
-      50% { background-color: #f4f6f9; }
-      100% { background-color: #f4f6f9; }
+    #video{ width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; }
+    .flash{ animation:flashAnim 0.4s; }
+    @keyframes flashAnim{
+      0%{ background-color:#ffff99; }
+      50%{ background-color:#f4f6f9; }
+      100%{ background-color:#f4f6f9; }
     }
 
-    /* Impresión QR */
     @media print {
-      body * { visibility: hidden; }
-      #print-area, #print-area * { visibility: visible; }
-      #print-area {
-        position: absolute; left: 0; top: 0; width: 100%;
+      body * { visibility:hidden; }
+      #print-area, #print-area * { visibility:visible; }
+      #print-area{
+        position:absolute; left:0; top:0; width:100%;
         display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box;
       }
-      .label {
-        width:32%; margin:1%; text-align:center;
-        page-break-inside: avoid;
-        display:flex; flex-direction:column; align-items:center;
-      }
-      .label-name { margin-top:5px; font-size:12px; text-align:center; }
+      .label{ width:32%; margin:1%; text-align:center; page-break-inside:avoid;
+        display:flex; flex-direction:column; align-items:center; }
+      .label-name{ margin-top:5px; font-size:12px; text-align:center; }
     }
 
-    .label { border:2px dashed #1976d2; padding:6px; margin:6px;
+    .label{ border:2px dashed #1976d2; padding:6px; margin:6px;
       display:inline-flex; flex-direction:column; align-items:center;
       width:30%; border-radius:8px; background:white; }
-    .label .label-name { margin-top:6px; font-size:13px; text-align:center;
+    .label .label-name{ margin-top:6px; font-size:13px; text-align:center;
       color:#d32f2f; font-weight:bold; }
 
-    /* Botones */
-    #importBtn { background-color:#388e3c; color:white; font-weight:bold; }
-    #printAll { background-color:#1976d2; color:white; }
-    #exportPDF { background-color:black; color:white; font-weight:bold; }
-    #clearData { background-color:#d32f2f; color:white; }
-    #startScanner { border-color:#1976d2; color:#1976d2; }
-    #stopScanner { border-color:#d32f2f; color:#d32f2f; }
+    #importBtn{ background:#388e3c; color:white; font-weight:bold; }
+    #printAll{ background:#1976d2; color:white; }
+    #exportPDF{ background:black; color:white; font-weight:bold; }
+    #clearData{ background:#d32f2f; color:white; }
+    #startScanner{ border-color:#1976d2; color:#1976d2; }
+    #stopScanner{ border-color:#d32f2f; color:#d32f2f; }
   </style>
 </head>
 <body>
@@ -88,7 +75,6 @@
 
   <div class="container">
     <div class="row g-3">
-      <!-- Columna izquierda -->
       <div class="col-lg-4">
         <div class="card mb-3">
           <div class="card-body">
@@ -108,7 +94,6 @@
               <canvas id="canvas" style="display:none;"></canvas>
               <small id="scanStatus" class="text-success"></small>
 
-              <!-- Filtro por grado -->
               <div class="mt-2">
                 <label for="gradeFilter" class="form-label">Filtrar por grado:</label>
                 <select id="gradeFilter" class="form-select">
@@ -116,9 +101,7 @@
                 </select>
               </div>
 
-              <!-- Listado -->
               <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
-
               <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
             </div>
             <hr/>
@@ -126,56 +109,34 @@
           </div>
         </div>
 
-        <!-- Dashboard -->
         <div class="card mb-3">
           <div class="card-body">
-            <h5>Dashboard (tiempo real)</h5>
-            <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
-            <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
-            <p>Asistencias totales: <strong id="attTotal">0</strong></p>
-            <button id="clearData" class="btn btn-sm">Borrar toda la base (local)</button>
-          </div>
-        </div>
-
-        <!-- Estadística -->
-        <div class="card mb-3">
-          <div class="card-header">
-            <button class="btn btn-link w-100 text-start" data-bs-toggle="collapse" data-bs-target="#collapseStats">
-              📊 Ver estadística (últimos 5 días hábiles)
-            </button>
-          </div>
-          <div id="collapseStats" class="collapse">
-            <div class="card-body">
+            <h5 data-bs-toggle="collapse" data-bs-target="#collapseStats" style="cursor:pointer;">
+              📊 Estadística semanal
+            </h5>
+            <div id="collapseStats" class="collapse show">
               <canvas id="attendanceChart" height="200"></canvas>
             </div>
           </div>
         </div>
 
-        <!-- Agregar estudiante manual -->
-        <div class="card mb-3">
-          <div class="card-header">
-            <button class="btn btn-link w-100 text-start" data-bs-toggle="collapse" data-bs-target="#collapseAdd">
+        <!-- Nuevo bloque: Agregar estudiante manual -->
+        <div class="card">
+          <div class="card-body">
+            <h5 data-bs-toggle="collapse" data-bs-target="#collapseAddStudent" style="cursor:pointer;">
               ➕ Agregar estudiante manual
-            </button>
-          </div>
-          <div id="collapseAdd" class="collapse">
-            <div class="card-body">
+            </h5>
+            <div id="collapseAddStudent" class="collapse">
               <input id="manualName" type="text" class="form-control mb-2" placeholder="Nombre completo" />
               <input id="manualGrade" type="text" class="form-control mb-2" placeholder="Grado (ej: 10-3)" />
-              <button id="addStudentBtn" class="btn btn-success w-100">Agregar estudiante</button>
-              <div id="lastStudentQR" class="text-center mt-3" style="display:none;">
-                <h6>Último estudiante agregado:</h6>
-                <div id="qrContainer" class="d-flex justify-content-center mb-2"></div>
-                <p id="lastStudentInfo" class="fw-bold text-primary"></p>
-                <button id="printLastQR" class="btn btn-sm btn-primary">Imprimir este QR</button>
-              </div>
+              <button id="addManualBtn" class="btn btn-success w-100">Agregar</button>
+              <div id="manualQR" class="text-center mt-3"></div>
+              <button id="printManualQR" class="btn btn-primary w-100 mt-2" style="display:none;">Imprimir este QR</button>
             </div>
           </div>
         </div>
-
       </div>
 
-      <!-- Columna derecha -->
       <div class="col-lg-8">
         <div id="print-area" style="display:none;"></div>
       </div>
@@ -194,11 +155,11 @@
     function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
     function todayKey(){ return new Date().toISOString().slice(0,10); }
 
+    const gradeFilter=document.getElementById('gradeFilter');
     const totalStudentsEl=document.getElementById('totalStudents');
     const attTodayEl=document.getElementById('attToday');
     const attTotalEl=document.getElementById('attTotal');
-    document.getElementById('todayDate').textContent=todayKey();
-    const gradeFilter=document.getElementById('gradeFilter');
+    const { jsPDF }=window.jspdf;
 
     // CSV import
     document.getElementById('importBtn').addEventListener('click',()=>{
@@ -217,7 +178,8 @@
           }
           writeStudents(arr);
           alert(`Importación finalizada: ${added} estudiantes añadidos.`);
-          renderDashboard(); updateGradeFilter();
+          updateGradeFilter();
+          renderChart();
         }
       });
     });
@@ -232,20 +194,10 @@
       if(att[key][student.id]) return 'already';
       att[key][student.id]=new Date().toISOString();
       writeAttendance(att);
-      renderDashboard(); renderTodayList();
+      renderTodayList();
+      renderChart();
       return student.name;
     }
-
-    // Dashboard
-    function renderDashboard(){
-      const students=readStudents();
-      const att=readAttendance(); const today=todayKey();
-      totalStudentsEl.textContent=students.length;
-      attTodayEl.textContent=att[today]?Object.keys(att[today]).length:0;
-      attTotalEl.textContent=Object.values(att).reduce((s,o)=>s+Object.keys(o).length,0);
-      renderChart();
-    }
-    renderDashboard();
 
     // Filtro de grados dinámico
     function updateGradeFilter(){
@@ -329,16 +281,15 @@
             try{ parsed=JSON.parse(code.data); }catch(e){ parsed=null; }
             if(parsed&&parsed.name&&parsed.grade){
               const res=registerAttendanceQR(parsed.name,parsed.grade);
-              if(res==='notfound'){ scanStatus.textContent='Estudiante no encontrado'; speak('Estudiante no encontrado'); }
-              else if(res==='already'){ scanStatus.textContent='Ya registrado'; speak('Estudiante ya registrado'); }
-              else{ scanStatus.textContent=`Registrado: ${res}`; speak(`Estudiante registrado: ${res}`); }
-            } else { scanStatus.textContent='QR inválido'; speak('QR inválido'); }
+              if(res==='notfound'){ scanStatus.textContent='Estudiante no encontrado'; }
+              else if(res==='already'){ scanStatus.textContent='Ya registrado'; }
+              else{ scanStatus.textContent=`Registrado: ${res}`; }
+            } else { scanStatus.textContent='QR inválido'; }
           }
         } else { scanStatus.textContent='Buscando QR...'; }
       }
       requestAnimationFrame(scanLoop);
     }
-    function speak(t){ const u=new SpeechSynthesisUtterance(t); window.speechSynthesis.speak(u); }
 
     // Print all QRs
     function buildPrintLabels(){
@@ -363,7 +314,7 @@
     document.getElementById('exportPDF').addEventListener('click',()=>{
       const att=readAttendance(); const today=todayKey();
       if(!att[today]){ alert('No hay registros hoy'); return; }
-      const students=readStudents(); const { jsPDF }=window.jspdf; const doc=new jsPDF();
+      const students=readStudents(); const doc=new jsPDF();
       doc.setFontSize(14); doc.text(`Estudiantes registrados - ${today}`,14,20);
       const tableCol=["N°","Nombre","Grado","Fecha"];
       const tableRows=[]; let index=1;
@@ -376,76 +327,68 @@
           }
         }
       });
-      if(tableRows.length===0){ alert('No hay registros para este filtro'); return; }
-      doc.autoTable({head:[tableCol],body:tableRows,startY:30});
-      doc.save(`asistencia_${today}.pdf`);
+      doc.autoTable({ head:[tableCol], body:tableRows, startY:30, theme:'grid' });
+      doc.save(`Estudiantes_${today}.pdf`);
     });
 
-    // Clear
-    document.getElementById('clearData').addEventListener('click',()=>{
-      if(confirm('¿Borrar toda la base local?')){
-        localStorage.removeItem(STORAGE_STUDENTS);
-        localStorage.removeItem(STORAGE_ATT);
-        renderDashboard(); updateGradeFilter(); renderTodayList();
-      }
-    });
-
-    // Chart
-    let chart=null;
-    function getLastWeekdays(n){
+    // Estadística 5 días hábiles
+    function getLastSchoolDays(n=5){
       const days=[]; let d=new Date();
       while(days.length<n){
-        const day=d.getDay(); // 0=Dom,6=Sab
-        if(day!==0&&day!==6) days.unshift(d.toISOString().slice(0,10));
+        if(d.getDay()!==0 && d.getDay()!==6){
+          days.unshift(new Date(d));
+        }
         d.setDate(d.getDate()-1);
       }
       return days;
     }
+    let chart;
     function renderChart(){
-      const att=readAttendance(); const labels=getLastWeekdays(5);
-      const values=labels.map(day=>att[day]?Object.keys(att[day]).length:0);
-      const ctx=document.getElementById('attendanceChart').getContext('2d');
+      const ctx=document.getElementById('attendanceChart');
+      const att=readAttendance(); const students=readStudents();
+      const days=getLastSchoolDays(5);
+      const labels=days.map(d=>d.toLocaleDateString('es-ES',{weekday:'long'}));
+      const data=days.map(d=>{
+        const key=d.toISOString().slice(0,10);
+        return att[key]?Object.keys(att[key]).length:0;
+      });
       if(chart) chart.destroy();
-      chart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Asistencias',data:values}]}});
+      chart=new Chart(ctx,{
+        type:'bar',
+        data:{ labels, datasets:[{ label:'Asistencias', data }]},
+        options:{ responsive:true, maintainAspectRatio:false }
+      });
     }
     renderChart();
 
-    // Agregar estudiante manual
-    document.getElementById('addStudentBtn').addEventListener('click',()=>{
+    // Manual add student
+    document.getElementById('addManualBtn').addEventListener('click',()=>{
       const name=document.getElementById('manualName').value.trim();
       const grade=document.getElementById('manualGrade').value.trim();
       if(!name||!grade){ alert('Ingrese nombre y grado'); return; }
       const arr=readStudents();
-      const student={id:uid(),name,grade,createdAt:new Date().toISOString()};
+      const student={id:uid(), name, grade, createdAt:new Date().toISOString()};
       arr.push(student); writeStudents(arr);
-      updateGradeFilter(); renderDashboard();
-      document.getElementById('manualName').value='';
-      document.getElementById('manualGrade').value='';
-      showLastStudentQR(student);
-    });
-
-    function showLastStudentQR(student){
-      const div=document.getElementById('lastStudentQR');
-      div.style.display='block';
-      document.getElementById('qrContainer').innerHTML='';
+      updateGradeFilter();
+      renderTodayList();
+      renderChart();
+      // QR
+      const qrDiv=document.getElementById('manualQR'); qrDiv.innerHTML='';
       const payload=JSON.stringify({name:student.name,grade:student.grade});
-      new QRCode(document.getElementById('qrContainer'),{text:payload,width:200,height:200});
-      document.getElementById('lastStudentInfo').textContent=`${student.name} - ${student.grade}`;
-      document.getElementById('printLastQR').onclick=()=>{
-        const area=document.getElementById('print-area');
-        area.innerHTML='';
-        const label=document.createElement('div'); label.className='label';
-        const holder=document.createElement('div'); label.appendChild(holder);
-        const nameEl=document.createElement('div'); nameEl.className='label-name';
-        nameEl.textContent=`${student.name} - ${student.grade}`;
-        label.appendChild(nameEl); area.appendChild(label);
-        new QRCode(holder,{text:payload,width:140,height:140});
-        area.style.display='block';
-        setTimeout(()=>{ window.print(); area.style.display='none'; },500);
+      new QRCode(qrDiv,{text:payload,width:200,height:200});
+      document.getElementById('printManualQR').style.display='block';
+      document.getElementById('printManualQR').onclick=()=>{
+        const w=window.open('');
+        w.document.write(`<h3>${student.name} - ${student.grade}</h3><div id='qrcode'></div>`);
+        w.document.close();
+        new QRCode(w.document.getElementById('qrcode'),{text:payload,width:180,height:180});
+        setTimeout(()=>w.print(),500);
       };
-    }
+      alert('Estudiante agregado manualmente.');
+    });
   </script>
 
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
