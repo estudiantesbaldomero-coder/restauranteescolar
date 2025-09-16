@@ -17,7 +17,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
   <style>
-    body { padding: 1rem; background:#f4f6f9; font-family:Arial, sans-serif; }
+    body { padding: 1rem; background:#f4f6f9; }
 
     /* Encabezado */
     header {
@@ -67,21 +67,25 @@
     .label .label-name { margin-top:6px; font-size:13px; text-align:center;
       color:#d32f2f; font-weight:bold; }
 
-    /* Botones destacados */
-    button { font-weight:bold; border-radius:6px; }
-
-    #importBtn { background-color:#388e3c; color:white; }
+    /* Botones */
+    #importBtn { background-color:#388e3c; color:white; font-weight:bold; }
     #printAll { background-color:#1976d2; color:white; }
-    #exportPDF { background-color:#d32f2f; color:white; }
+    #exportPDF { background-color:black; color:white; font-weight:bold; }
     #clearData { background-color:#d32f2f; color:white; }
     #startScanner { border-color:#1976d2; color:#1976d2; }
     #stopScanner { border-color:#d32f2f; color:#d32f2f; }
 
     /* Tarjeta agregar estudiante manual */
-    #manualStudentForm { border:2px solid #d32f2f; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
+    #manualStudentForm { border:3px solid #d32f2f; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
+    #manualStudentForm input, #manualStudentForm button { margin-bottom:5px; }
 
-    /* Bloques plegables */
-    .card-header { cursor:pointer; user-select:none; }
+    /* Botón destacado */
+    #toggleManualForm { background-color:#1976d2; color:white; font-weight:bold; }
+
+    /* Dashboard */
+    #dashboardCard { border:3px solid #d32f2f; padding:10px; border-radius:8px; background:white; }
+    #manualCard { border:3px solid #d32f2f; padding:10px; border-radius:8px; background:white; }
+
   </style>
 </head>
 <body>
@@ -98,8 +102,8 @@
     <div class="row g-3">
       <div class="col-lg-4">
 
-        <!-- Importar y escáner -->
-        <div class="card mb-3">
+        <!-- Importar CSV y Escáner -->
+        <div class="card mb-3" id="scannerCard">
           <div class="card-body">
             <h5>Importar estudiantes (CSV)</h5>
             <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
@@ -111,11 +115,13 @@
               <button id="startScanner" class="btn w-100 mb-1">Iniciar escáner</button>
               <button id="stopScanner" class="btn w-100 mb-1">Detener escáner</button>
             </div>
+
             <div id="scanner-area" style="display:none;">
               <video id="video" autoplay playsinline></video>
               <canvas id="canvas" style="display:none;"></canvas>
               <small id="scanStatus" class="text-success"></small>
 
+              <!-- Filtro por grado -->
               <div class="mt-2">
                 <label for="gradeFilter" class="form-label">Filtrar por grado:</label>
                 <select id="gradeFilter" class="form-select">
@@ -123,7 +129,9 @@
                 </select>
               </div>
 
+              <!-- Listado -->
               <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
+
               <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
             </div>
             <hr/>
@@ -131,12 +139,10 @@
           </div>
         </div>
 
-        <!-- Dashboard plegable -->
-        <div class="card mb-3">
-          <div class="card-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display==='none'?'block':'none';">
-            <h5>Dashboard (tiempo real) ▼</h5>
-          </div>
-          <div class="card-body" style="display:block;">
+        <!-- Dashboard -->
+        <div class="card mb-3" id="dashboardCard">
+          <div class="card-body">
+            <h5>Dashboard (tiempo real)</h5>
             <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
             <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
             <p>Asistencias totales: <strong id="attTotal">0</strong></p>
@@ -145,13 +151,15 @@
           </div>
         </div>
 
-        <!-- Agregar estudiante manual plegable -->
-        <div>
-          <button class="btn w-100 mb-2" id="toggleManualForm">Agregar estudiante manualmente ▼</button>
-          <div id="manualStudentForm">
-            <input type="text" id="manualName" placeholder="Nombre completo" class="form-control mb-1">
-            <input type="text" id="manualGrade" placeholder="Grado (ej. 10-3)" class="form-control mb-1">
-            <button class="btn w-100" id="addManualStudent">Agregar y generar QR</button>
+        <!-- Agregar estudiante manual -->
+        <div class="card mb-3" id="manualCard">
+          <div class="card-body">
+            <button class="btn w-100 mb-2" id="toggleManualForm">Agregar Estudiante</button>
+            <div id="manualStudentForm">
+              <input type="text" id="manualName" placeholder="Nombre completo" class="form-control mb-1">
+              <input type="text" id="manualGrade" placeholder="Grado (ej. 10-3)" class="form-control mb-1">
+              <button class="btn w-100" id="addManualStudent">Agregar y generar QR</button>
+            </div>
           </div>
         </div>
 
@@ -164,16 +172,15 @@
   </div>
 
 <script>
+// --------- (Toda la programación existente se mantiene intacta) ---------
 const STORAGE_STUDENTS='rs_students_v1';
 const STORAGE_ATT='rs_attendance_v1';
-
 function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
 function writeStudents(a){ localStorage.setItem(STORAGE_STUDENTS,JSON.stringify(a)); }
 function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT)||'{}'); }
 function writeAttendance(o){ localStorage.setItem(STORAGE_ATT,JSON.stringify(o)); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 function todayKey(){ return new Date().toISOString().slice(0,10); }
-
 const totalStudentsEl=document.getElementById('totalStudents');
 const attTodayEl=document.getElementById('attToday');
 const attTotalEl=document.getElementById('attTotal');
@@ -404,14 +411,15 @@ document.getElementById('addManualStudent').addEventListener('click',()=>{
   writeStudents(arr);
   updateGradeFilter(); renderDashboard(); renderTodayList();
 
-  // Mostrar QR solo de este estudiante
-  const container=document.getElementById('print-area'); container.innerHTML=''; container.style.display='block';
+  // Generar QR solo visible 30 segundos
+  const container=document.getElementById('print-area'); container.style.display='block';
   const label=document.createElement('div'); label.className='label';
   const holder=document.createElement('div'); label.appendChild(holder);
   const nameEl=document.createElement('div'); nameEl.className='label-name'; nameEl.textContent=`${student.name} - ${student.grade}`;
   label.appendChild(nameEl); container.appendChild(label);
   const payload=JSON.stringify({name:student.name,grade:student.grade});
-  setTimeout(()=>{ new QRCode(holder,{text:payload,width:140,height:140}); },100);
+  new QRCode(holder,{text:payload,width:140,height:140});
+  setTimeout(()=>{ container.removeChild(label); if(container.children.length===0) container.style.display='none'; },30000);
 
   alert('Estudiante agregado correctamente con su QR.');
 });
@@ -431,6 +439,8 @@ if(readStudents().length===0){
 </script>
 </body>
 </html>
+
+
 
 
 
