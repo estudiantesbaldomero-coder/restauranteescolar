@@ -17,30 +17,45 @@
 
   <style>
     body { padding:1rem; background:#f4f6f9; }
-    header { display:flex; align-items:center; justify-content:center; background: linear-gradient(90deg,#d32f2f,#1976d2,#388e3c); padding:12px 20px; border-radius:10px; margin-bottom:1rem; color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2); }
+
+    header {
+      display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(90deg,#d32f2f,#1976d2,#388e3c);
+      padding:12px 20px; border-radius:10px; margin-bottom:1rem;
+      color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2);
+    }
     header img { height:65px; margin-right:15px; }
     header h2 { margin:0; font-size:1.4rem; }
     header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
+
     #video { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; }
+
     .flash { animation: flashAnim 0.4s; }
     @keyframes flashAnim { 0%{background:#ffff99;}50%{background:#f4f6f9;}100%{background:#f4f6f9;} }
+
     @media print{
       body * { visibility:hidden; }
       #print-area,#print-area * { visibility:visible; }
-      #print-area { position:absolute; left:0; top:0; width:100%; display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box; }
+      #print-area {
+        position:absolute; left:0; top:0; width:100%;
+        display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box;
+      }
       .label{ width:32%; margin:1%; text-align:center; page-break-inside:avoid; display:flex; flex-direction:column; align-items:center; }
       .label-name{ margin-top:5px; font-size:12px; text-align:center; }
     }
+
     .label { border:3px dashed #d32f2f; padding:6px; margin:6px; display:inline-flex; flex-direction:column; align-items:center; width:30%; border-radius:8px; background:white; }
     .label .label-name { margin-top:6px; font-size:13px; text-align:center; color:#d32f2f; font-weight:bold; }
+
     #importBtn { background-color:#388e3c; color:white; font-weight:bold; }
     #printAll { background-color:#1976d2; color:white; font-weight:bold; }
     #exportPDF { background-color:black; color:white; font-weight:bold; }
     #clearData { background-color:#d32f2f; color:white; }
     #startScanner { border-color:#1976d2; color:#1976d2; }
-    #stopScanner { border-color:#d32f2f; color:#d32f2d; }
+    #stopScanner { border-color:#d32f2f; color:#d32f2f; }
     #toggleManualForm { background-color:#388e3c; color:white; font-weight:bold; }
     #addManualStudent { background-color:#1976d2; color:white; font-weight:bold; }
+
     .card-header { cursor:pointer; font-weight:bold; background:#fff; color:#000; }
     .card-body{ border:2px solid #388e3c; border-radius:8px; }
     #manualStudentForm { border:2px solid #388e3c; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
@@ -59,8 +74,6 @@
   <div class="container">
     <div class="row g-3">
       <div class="col-lg-4">
-
-        <!-- Importar estudiantes CSV y escáner QR -->
         <div class="card mb-3">
           <div class="card-body">
             <h5>Importar estudiantes (CSV)</h5>
@@ -76,6 +89,12 @@
               <video id="video" autoplay playsinline></video>
               <canvas id="canvas" style="display:none;"></canvas>
               <small id="scanStatus" class="text-success"></small>
+              <div class="mt-2">
+                <label for="gradeFilter" class="form-label">Filtrar por grado:</label>
+                <select id="gradeFilter" class="form-select">
+                  <option value="all">Todos los grados</option>
+                </select>
+              </div>
               <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
               <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
             </div>
@@ -84,7 +103,6 @@
           </div>
         </div>
 
-        <!-- Dashboard colapsable -->
         <div class="card mb-3">
           <div class="card-header" onclick="toggleCard(this)">Dashboard (tiempo real)</div>
           <div class="card-body">
@@ -96,7 +114,6 @@
           </div>
         </div>
 
-        <!-- Agregar Estudiante colapsable -->
         <div class="card mb-3">
           <div class="card-header" onclick="toggleCard(this)">Agregar Estudiante</div>
           <div class="card-body">
@@ -108,7 +125,6 @@
             </div>
           </div>
         </div>
-
       </div>
 
       <div class="col-lg-8">
@@ -131,11 +147,12 @@ const totalStudentsEl=document.getElementById('totalStudents');
 const attTodayEl=document.getElementById('attToday');
 const attTotalEl=document.getElementById('attTotal');
 document.getElementById('todayDate').textContent=todayKey();
+const gradeFilter=document.getElementById('gradeFilter');
 
-// Toggle cards
 function toggleCard(header){
   const body=header.nextElementSibling;
-  body.style.display=(body.style.display==='none'||body.style.display==='')?'block':'none';
+  if(body.style.display==='none'||body.style.display===''){ body.style.display='block'; }
+  else{ body.style.display='none'; }
 }
 
 // CSV import
@@ -154,7 +171,7 @@ document.getElementById('importBtn').addEventListener('click',()=>{
       }
       writeStudents(arr);
       alert(`Importación finalizada: ${added} estudiantes añadidos.`);
-      renderDashboard(); renderTodayList();
+      renderDashboard(); updateGradeFilter(); renderTodayList();
     }
   });
 });
@@ -166,7 +183,39 @@ function renderDashboard(){
   totalStudentsEl.textContent=students.length;
   attTodayEl.textContent=att[today]?Object.keys(att[today]).length:0;
   attTotalEl.textContent=Object.values(att).reduce((s,o)=>s+Object.keys(o).length,0);
+  renderChart();
 }
+
+// Chart
+const ctx=document.getElementById('attendanceChart').getContext('2d');
+let attendanceChart=null;
+function renderChart(){
+  const last5=getLast5Workdays();
+  const labels=last5.map(d=>d.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit'}));
+  const att=readAttendance();
+  const data=last5.map(d=>{ const key=d.toISOString().slice(0,10); return att[key]?Object.keys(att[key]).length:0; });
+  if(attendanceChart) attendanceChart.destroy();
+  attendanceChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Asistencias',data,backgroundColor:'#1976d2'}]}});
+}
+function getLast5Workdays(){
+  const res=[]; const today=new Date(); let day=today;
+  while(res.length<5){
+    const wd=day.getDay();
+    if(wd>0&&wd<6) res.unshift(new Date(day));
+    day.setDate(day.getDate()-1);
+  }
+  return res;
+}
+
+// Filtro por grado
+function updateGradeFilter(){
+  const students=readStudents();
+  const unique=[...new Set(students.map(s=>s.grade))].sort();
+  gradeFilter.innerHTML='<option value="all">Todos los grados</option>';
+  unique.forEach(g=>{ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; gradeFilter.appendChild(opt); });
+}
+gradeFilter.addEventListener('change', renderTodayList);
+updateGradeFilter();
 
 // Lista asistencia hoy
 function renderTodayList(){
@@ -176,9 +225,8 @@ function renderTodayList(){
     const students=readStudents(); let index=1;
     Object.keys(att[today]).forEach(id=>{
       const s=students.find(st=>st.id===id);
-      if(s){
-        const li=document.createElement('li');
-        li.className='list-group-item flash';
+      if(s&&(gradeFilter.value==='all'||gradeFilter.value===s.grade)){
+        const li=document.createElement('li'); li.className='list-group-item flash';
         li.textContent=`${index}. ${s.name} - ${s.grade}`;
         ul.appendChild(li); index++;
         setTimeout(()=>li.classList.remove('flash'),400);
@@ -186,38 +234,166 @@ function renderTodayList(){
     });
   }
 }
-renderDashboard(); renderTodayList();
+
+// Registrar asistencia QR
+function registerAttendanceQR(name, grade){
+  const students=readStudents();
+  const student=students.find(s=>s.name===name&&s.grade===grade);
+  if(!student) return 'notfound';
+  const att=readAttendance(); const key=todayKey();
+  if(!att[key]) att[key]={};
+  if(att[key][student.id]) return 'already';
+  att[key][student.id]=new Date().toISOString();
+  writeAttendance(att);
+  renderDashboard(); renderTodayList();
+  return student.name;
+}
+
+// Scanner
+let videoStream=null, scanning=false;
+const video=document.getElementById('video');
+const canvas=document.getElementById('canvas');
+const ctx2=canvas.getContext('2d');
+const scanStatus=document.getElementById('scanStatus');
+document.get
+  .getElementById('startScanner').addEventListener('click',startScanner);
+document.getElementById('stopScanner').addEventListener('click',stopScanner);
+
+async function startScanner(){
+  if(scanning) return;
+  try{
+    let stream=null;
+    try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"}}}); }
+    catch(e){ stream=await navigator.mediaDevices.getUserMedia({video:true}); }
+    video.srcObject=stream;
+    videoStream=stream;
+    scanning=true;
+    document.getElementById('scanner-area').style.display='block';
+    scanLoop();
+  }catch(err){ alert('No se pudo acceder a la cámara: '+err.message); }
+}
+function stopScanner(){
+  scanning=false;
+  if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; }
+  document.getElementById('scanner-area').style.display='none';
+  scanStatus.textContent='';
+}
+video.addEventListener('loadedmetadata',()=>{ video.style.height=video.offsetWidth+'px'; });
+
+let lastScan=0;
+function scanLoop(){
+  if(!scanning) return;
+  if(video.readyState===video.HAVE_ENOUGH_DATA){
+    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+    ctx2.drawImage(video,0,0,canvas.width,canvas.height);
+    const imgData=ctx2.getImageData(0,0,canvas.width,canvas.height);
+    const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"attemptBoth"});
+    if(code){
+      const now=Date.now();
+      if(now-lastScan>1500){
+        lastScan=now;
+        let parsed=null;
+        try{ parsed=JSON.parse(code.data); }catch(e){ parsed=null; }
+        if(parsed && parsed.name && parsed.grade){
+          const res=registerAttendanceQR(parsed.name,parsed.grade);
+          if(res==='notfound'){ scanStatus.textContent='Estudiante no encontrado'; speak('Estudiante no encontrado'); }
+          else if(res==='already'){ scanStatus.textContent='Ya registrado'; speak('Estudiante ya registrado'); }
+          else{ scanStatus.textContent=`Registrado: ${res}`; speak(`Estudiante registrado: ${res}`); }
+        } else { scanStatus.textContent='QR inválido'; speak('QR inválido'); }
+      }
+    } else { scanStatus.textContent='Buscando QR...'; }
+  }
+  requestAnimationFrame(scanLoop);
+}
+function speak(text){ const u=new SpeechSynthesisUtterance(text); window.speechSynthesis.speak(u); }
 
 // Agregar estudiante manual
-document.getElementById('toggleManualForm').addEventListener('click', ()=>{
-  const f=document.getElementById('manualStudentForm'); f.style.display = f.style.display==='none'?'block':'none';
+document.getElementById('toggleManualForm').addEventListener('click',()=>{
+  const f=document.getElementById('manualStudentForm');
+  f.style.display=(f.style.display==='none'||f.style.display==='')?'block':'none';
 });
-document.getElementById('addManualStudent').addEventListener('click', ()=>{
+document.getElementById('addManualStudent').addEventListener('click',()=>{
   const name=document.getElementById('manualName').value.trim();
   const grade=document.getElementById('manualGrade').value.trim();
   if(!name||!grade){ alert('Ingrese nombre y grado'); return; }
-  const arr=readStudents(); const student={id:uid(), name, grade, createdAt:new Date().toISOString()};
-  arr.push(student); writeStudents(arr);
-  renderDashboard(); renderTodayList();
-  const container=document.getElementById('print-area'); container.style.display='block';
-  const label=document.createElement('div'); label.className='label';
-  const holder=document.createElement('div'); label.appendChild(holder);
-  const nameEl=document.createElement('div'); nameEl.className='label-name'; nameEl.textContent=`${student.name} - ${student.grade}`;
-  label.appendChild(nameEl); container.appendChild(label);
-  const payload=JSON.stringify({name:student.name,grade:student.grade});
-  new QRCode(holder,{text:payload,width:140,height:140});
-  setTimeout(()=>{ container.removeChild(label); if(container.childElementCount===0) container.style.display='none'; },30000);
-  alert('Estudiante agregado correctamente con su QR temporal (30s).');
+  const students=readStudents();
+  const newStudent={id:uid(), name, grade, createdAt:new Date().toISOString()};
+  students.push(newStudent);
+  writeStudents(students);
+  updateGradeFilter();
+  renderDashboard();
+  alert('Estudiante agregado');
+  buildPrintLabel([newStudent]);
+});
+
+// Construir QR para impresión individual o todos
+function buildPrintLabel(students){
+  const container=document.getElementById('print-area');
+  container.innerHTML='';
+  container.style.display='block';
+  for(const s of students){
+    const label=document.createElement('div'); label.className='label';
+    const holder=document.createElement('div'); label.appendChild(holder);
+    const nameEl=document.createElement('div'); nameEl.className='label-name'; nameEl.textContent=`${s.name} - ${s.grade}`; label.appendChild(nameEl);
+    container.appendChild(label);
+    const payload=JSON.stringify({name:s.name, grade:s.grade});
+    new QRCode(holder,{text:payload,width:140,height:140});
+  }
+  setTimeout(()=>{ window.print(); container.style.display='none'; },500);
+}
+
+// Imprimir todos los QR
+document.getElementById('printAll').addEventListener('click',()=>{
+  buildPrintLabel(readStudents());
+});
+
+// Export PDF
+document.getElementById('exportPDF').addEventListener('click',()=>{
+  const att=readAttendance(); const today=todayKey();
+  if(!att[today]){ alert('No hay registros hoy'); return; }
+  const students=readStudents(); const { jsPDF }=window.jspdf;
+  const doc=new jsPDF(); doc.setFontSize(14);
+  doc.text(`Estudiantes registrados - ${today}`,14,20);
+  const tableCol=["N°","Nombre","Grado","Fecha de registro"];
+  const tableRows=[]; let index=1;
+  Object.keys(att[today]).forEach(id=>{
+    const s=students.find(st=>st.id===id);
+    if(s){
+      const dateReg=new Date(att[today][id]).toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+      tableRows.push([index++,s.name,s.grade,dateReg]);
+    }
+  });
+  doc.autoTable({head:[tableCol],body:tableRows,startY:30,styles:{cellPadding:2,fontSize:12},theme:'grid'});
+  doc.save(`Estudiantes_${today}.pdf`);
+});
+
+// Clear data
+document.getElementById('clearData').addEventListener('click',()=>{
+  if(confirm('Borrar estudiantes y asistencias?')){
+    localStorage.removeItem(STORAGE_STUDENTS);
+    localStorage.removeItem(STORAGE_ATT);
+    renderDashboard(); renderTodayList(); updateGradeFilter();
+  }
 });
 
 // Demo students
 if(readStudents().length===0){
-  const sample=[{id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
-  {id:uid(),name:'María Gómez',grade:'9-2',createdAt:new Date().toISOString()},
-  {id:uid(),name:'Juan Rodríguez',grade:'11-3',createdAt:new Date().toISOString()},
-  {id:uid(),name:'Ana Morales',grade:'10-2',createdAt:new Date().toISOString()}];
-  writeStudents(sample); renderDashboard(); renderTodayList();
+  const sample=[
+    {id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
+    {id:uid(),name:'María Gómez',grade:'9-2',createdAt:new Date().toISOString()},
+    {id:uid(),name:'Juan Rodríguez',grade:'11-3',createdAt:new Date().toISOString()},
+    {id:uid(),name:'Ana Morales',grade:'10-2',createdAt:new Date().toISOString()}
+  ];
+  writeStudents(sample);
+  updateGradeFilter();
+  renderDashboard();
+  renderTodayList();
 }
 </script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
 </body>
 </html>
+
