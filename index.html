@@ -18,11 +18,12 @@
 
 <style>
 body { padding:1rem; background:#f4f6f9; }
+
 /* Encabezado */
 header { display:flex; align-items:center; justify-content:center; background: linear-gradient(90deg,#d32f2f,#1976d2,#388e3c); padding:12px 20px; border-radius:10px; margin-bottom:1rem; color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2); }
 header img { height:65px; margin-right:15px; }
-header h2 { margin:0; font-size:1.4rem; color:white; }
-header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; color:white; }
+header h2 { margin:0; font-size:1.4rem; }
+header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
 
 /* Video escáner */
 #video { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; }
@@ -33,21 +34,25 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; color:whi
 @media print{ body * { visibility:hidden; } #print-area,#print-area * { visibility:visible; } #print-area { position:absolute; left:0; top:0; width:100%; display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box; } .label{ width:32%; margin:1%; text-align:center; page-break-inside:avoid; display:flex; flex-direction:column; align-items:center; } .label-name{ margin-top:5px; font-size:12px; text-align:center; } }
 
 /* QR Label */
-.label { border:3px dashed #1976d2; padding:6px; margin:6px; display:inline-flex; flex-direction:column; align-items:center; width:30%; border-radius:8px; background:white; }
+.label { border:3px dashed #d32f2f; padding:6px; margin:6px; display:inline-flex; flex-direction:column; align-items:center; width:30%; border-radius:8px; background:white; }
 .label .label-name { margin-top:6px; font-size:13px; text-align:center; color:#d32f2f; font-weight:bold; }
 
-/* Botones */
-#importBtn { background-color:#388e3c; color:white; font-weight:bold; }
-#printAll { background-color:#1976d2; color:white; font-weight:bold; }
+/* Botones colores escudo */
+#importBtn { background-color:#388e3c; color:white; font-weight:bold; border:none; }
+#startScanner, #stopScanner { background-color:#1976d2; color:white; font-weight:bold; border:none; }
+#toggleManualForm, #addManualStudent { background-color:#388e3c; color:white; font-weight:bold; border:none; }
+#printAll { background-color:#1976d2; color:white; font-weight:bold; border:none; }
 #exportPDF { background-color:black; color:white; font-weight:bold; }
-#clearData { background-color:#d32f2f; color:white; }
-#startScanner { border-color:#1976d2; color:#1976d2; }
-#stopScanner { border-color:#d32f2f; color:#d32f2f; }
-#toggleManualForm { background-color:#388e3c; color:white; font-weight:bold; }
-#addManualStudent { background-color:#1976d2; color:white; font-weight:bold; }
+#clearData { background-color:#d32f2f; color:white; font-weight:bold; border:none; }
+
+/* Card títulos internos */
+.card h5 { font-weight:bold; margin-bottom:10px; }
+.card.green-border h5 { color:#388e3c; }
+.card.blue-border h5 { color:#1976d2; }
+.card.red-border h5 { color:#d32f2f; }
 
 /* Manual Student Form */
-#manualStudentForm { border:2px solid #388e3c; padding:10px; border-radius:8px; background:#fff; display:none; margin-top:1rem; }
+#manualStudentForm { border:2px solid #388e3c; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
 </style>
 </head>
 
@@ -65,12 +70,17 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; color:whi
 <div class="row g-3">
   <div class="col-lg-4">
     <!-- Importar estudiantes CSV -->
-    <div class="card mb-3">
+    <div class="card mb-3 green-border">
       <div class="card-body">
         <h5>Importar estudiantes (CSV)</h5>
         <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
         <button id="importBtn" class="btn w-100 mt-2">Cargar CSV</button>
-        <hr/>
+      </div>
+    </div>
+
+    <!-- Escáner QR -->
+    <div class="card mb-3 blue-border">
+      <div class="card-body">
         <h5>Escáner QR</h5>
         <div id="scanner-controls" class="mb-2">
           <button id="startScanner" class="btn w-100 mb-1">Iniciar escáner</button>
@@ -89,21 +99,11 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; color:whi
           <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
           <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
         </div>
-        <hr/>
-        <button id="printAll" class="btn w-100">Imprimir todos los QRs</button>
-
-        <!-- Manual Student Form al final -->
-        <button id="toggleManualForm" class="btn w-100 mt-2">Agregar estudiante manualmente</button>
-        <div id="manualStudentForm">
-          <input type="text" id="manualName" placeholder="Nombre completo" class="form-control mb-1">
-          <input type="text" id="manualGrade" placeholder="Grado (ej. 10-3)" class="form-control mb-1">
-          <button class="btn w-100" id="addManualStudent">Agregar y generar QR</button>
-        </div>
       </div>
     </div>
 
     <!-- Dashboard -->
-    <div class="card mb-3">
+    <div class="card mb-3 red-border">
       <div class="card-body">
         <h5>Dashboard (tiempo real)</h5>
         <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
@@ -113,6 +113,21 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; color:whi
         <button id="clearData" class="btn btn-sm mt-2">Borrar toda la base (local)</button>
       </div>
     </div>
+
+    <!-- Agregar estudiantes manual -->
+    <div class="card mb-3 green-border">
+      <div class="card-body">
+        <h5>Agregar estudiante manualmente</h5>
+        <button id="toggleManualForm" class="btn w-100 mb-2">Mostrar/ocultar formulario</button>
+        <div id="manualStudentForm">
+          <input type="text" id="manualName" placeholder="Nombre completo" class="form-control mb-1">
+          <input type="text" id="manualGrade" placeholder="Grado (ej. 10-3)" class="form-control mb-1">
+          <button class="btn w-100" id="addManualStudent">Agregar y generar QR</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="printAll" class="btn w-100 mb-2">Imprimir todos los QRs</button>
   </div>
 
   <div class="col-lg-8">
@@ -123,8 +138,8 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; color:whi
 
 <script>
 // ------------------- STORAGE -------------------
-const STORAGE_STUDENTS='rs_students_v2';
-const STORAGE_ATT='rs_attendance_v2';
+const STORAGE_STUDENTS='rs_students_final';
+const STORAGE_ATT='rs_attendance_final';
 function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
 function writeStudents(arr){ localStorage.setItem(STORAGE_STUDENTS,JSON.stringify(arr)); }
 function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT)||'{}'); }
@@ -302,9 +317,7 @@ function buildPrintLabels(){
     new QRCode(holder,{text:payload,width:140,height:140});
   }
 }
-document.getElementById('printAll').addEventListener('click',()=>{
-  buildPrintLabels(); setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },500);
-});
+document.getElementById('printAll').addEventListener('click',()=>{ buildPrintLabels(); setTimeout(()=>{ window.print(); container.style.display='none'; },500); });
 
 // ------------------- Export PDF -------------------
 document.getElementById('exportPDF').addEventListener('click',()=>{
@@ -350,18 +363,15 @@ document.getElementById('addManualStudent').addEventListener('click',()=>{
   if(!name||!grade){ alert('Ingrese nombre y grado'); return; }
   const arr=readStudents(); const newS={id:uid(), name, grade, createdAt:new Date().toISOString()}; arr.push(newS); writeStudents(arr);
   updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
-  
-  // Generar QR directamente en panel
-  const container=document.getElementById('print-area');
+  // Generar QR automáticamente en panel de impresión
+  const container=document.getElementById('print-area'); container.innerHTML=''; container.style.display='block';
   const label=document.createElement('div'); label.className='label';
   const holder=document.createElement('div'); label.appendChild(holder);
   const nameEl=document.createElement('div'); nameEl.className='label-name'; nameEl.textContent=`${name} - ${grade}`; label.appendChild(nameEl);
   container.appendChild(label);
-  container.style.display='block';
   new QRCode(holder,{text:JSON.stringify({name,grade}),width:140,height:140});
-
-  document.getElementById('manualName').value='';
-  document.getElementById('manualGrade').value='';
+  window.print(); container.style.display='none';
+  document.getElementById('manualName').value=''; document.getElementById('manualGrade').value='';
 });
 
 // ------------------- Demo students -------------------
@@ -377,6 +387,8 @@ updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
 </script>
 </body>
 </html>
+
+
 
 
 
