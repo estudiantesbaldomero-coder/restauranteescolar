@@ -18,41 +18,34 @@
 
 <style>
 body { padding:1rem; background:#f4f6f9; }
-
 /* Encabezado */
 header { display:flex; align-items:center; justify-content:center; background: linear-gradient(90deg,#d32f2f,#1976d2,#388e3c); padding:12px 20px; border-radius:10px; margin-bottom:1rem; color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2); }
 header img { height:65px; margin-right:15px; }
 header h2 { margin:0; font-size:1.4rem; }
 header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
-
 /* Video escáner */
 #video { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; }
 .flash { animation: flashAnim 0.4s; }
 @keyframes flashAnim { 0%{background:#ffff99;}50%{background:#f4f6f9;}100%{background:#f4f6f9;} }
-
 /* Impresión QR */
 @media print{ body * { visibility:hidden; } #print-area,#print-area * { visibility:visible; } #print-area { position:absolute; left:0; top:0; width:100%; display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box; } .label{ width:32%; margin:1%; text-align:center; page-break-inside:avoid; display:flex; flex-direction:column; align-items:center; } .label-name{ margin-top:5px; font-size:12px; text-align:center; } }
-
 /* QR Label */
 .label { border:3px dashed #d32f2f; padding:6px; margin:6px; display:inline-flex; flex-direction:column; align-items:center; width:30%; border-radius:8px; background:white; }
 .label .label-name { margin-top:6px; font-size:13px; text-align:center; color:#d32f2f; font-weight:bold; }
-
-/* Botones colores escudo */
-#importBtn { background-color:#388e3c; color:white; font-weight:bold; border:none; }
-#startScanner, #stopScanner { background-color:#1976d2; color:white; font-weight:bold; border:none; }
-#toggleManualForm, #addManualStudent { background-color:#388e3c; color:white; font-weight:bold; border:none; }
-#printAll { background-color:#1976d2; color:white; font-weight:bold; border:none; }
+/* Botones */
+#importBtn { background-color:#388e3c; color:white; font-weight:bold; }
+#printAll { background-color:#1976d2; color:white; font-weight:bold; }
 #exportPDF { background-color:black; color:white; font-weight:bold; }
-#clearData { background-color:#d32f2f; color:white; font-weight:bold; border:none; }
-
-/* Card títulos internos */
-.card h5 { font-weight:bold; margin-bottom:10px; }
-.card.green-border h5 { color:#388e3c; }
-.card.blue-border h5 { color:#1976d2; }
-.card.red-border h5 { color:#d32f2f; }
-
+#clearData { background-color:#d32f2f; color:white; }
+#startScanner { border-color:#1976d2; color:#1976d2; }
+#stopScanner { border-color:#d32f2f; color:#d32f2f; }
+#toggleManualForm { background-color:#388e3c; color:white; font-weight:bold; }
+#addManualStudent { background-color:#1976d2; color:white; font-weight:bold; }
 /* Manual Student Form */
 #manualStudentForm { border:2px solid #388e3c; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
+/* Bordes bloques */
+.card.green-border { border: 2px solid #388e3c; } /* Verde CSV, Scanner, Manual */
+.card.red-border { border: 2px solid #d32f2f; }   /* Rojo Dashboard */
 </style>
 </head>
 
@@ -69,18 +62,14 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
 <div class="container">
 <div class="row g-3">
   <div class="col-lg-4">
-    <!-- Importar estudiantes CSV -->
-    <div class="card mb-3 green-border">
+
+    <!-- Importar estudiantes CSV y Escáner QR -->
+    <div class="card green-border mb-3">
       <div class="card-body">
         <h5>Importar estudiantes (CSV)</h5>
         <input id="csvFile" type="file" accept=".csv,text/csv" class="form-control mb-2" />
         <button id="importBtn" class="btn w-100 mt-2">Cargar CSV</button>
-      </div>
-    </div>
-
-    <!-- Escáner QR -->
-    <div class="card mb-3 blue-border">
-      <div class="card-body">
+        <hr/>
         <h5>Escáner QR</h5>
         <div id="scanner-controls" class="mb-2">
           <button id="startScanner" class="btn w-100 mb-1">Iniciar escáner</button>
@@ -99,11 +88,13 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
           <ul id="todayStudents" class="list-group list-group-flush mt-2"></ul>
           <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
         </div>
+        <hr/>
+        <button id="printAll" class="btn w-100">Imprimir todos los QRs</button>
       </div>
     </div>
 
     <!-- Dashboard -->
-    <div class="card mb-3 red-border">
+    <div class="card red-border mb-3">
       <div class="card-body">
         <h5>Dashboard (tiempo real)</h5>
         <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
@@ -114,11 +105,10 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
       </div>
     </div>
 
-    <!-- Agregar estudiantes manual -->
-    <div class="card mb-3 green-border">
+    <!-- Agregar estudiante manual -->
+    <div class="card green-border mb-3">
       <div class="card-body">
-        <h5>Agregar estudiante manualmente</h5>
-        <button id="toggleManualForm" class="btn w-100 mb-2">Mostrar/ocultar formulario</button>
+        <button id="toggleManualForm" class="btn w-100 mb-2">Agregar estudiante manualmente</button>
         <div id="manualStudentForm">
           <input type="text" id="manualName" placeholder="Nombre completo" class="form-control mb-1">
           <input type="text" id="manualGrade" placeholder="Grado (ej. 10-3)" class="form-control mb-1">
@@ -127,7 +117,6 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
       </div>
     </div>
 
-    <button id="printAll" class="btn w-100 mb-2">Imprimir todos los QRs</button>
   </div>
 
   <div class="col-lg-8">
@@ -138,8 +127,8 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
 
 <script>
 // ------------------- STORAGE -------------------
-const STORAGE_STUDENTS='rs_students_final';
-const STORAGE_ATT='rs_attendance_final';
+const STORAGE_STUDENTS='rs_students_v2';
+const STORAGE_ATT='rs_attendance_v2';
 function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
 function writeStudents(arr){ localStorage.setItem(STORAGE_STUDENTS,JSON.stringify(arr)); }
 function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT)||'{}'); }
@@ -317,7 +306,7 @@ function buildPrintLabels(){
     new QRCode(holder,{text:payload,width:140,height:140});
   }
 }
-document.getElementById('printAll').addEventListener('click',()=>{ buildPrintLabels(); setTimeout(()=>{ window.print(); container.style.display='none'; },500); });
+document.getElementById('printAll').addEventListener('click',()=>{ buildPrintLabels(); setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },500); });
 
 // ------------------- Export PDF -------------------
 document.getElementById('exportPDF').addEventListener('click',()=>{
@@ -344,26 +333,17 @@ document.getElementById('exportPDF').addEventListener('click',()=>{
 });
 
 // ------------------- Clear data -------------------
-document.getElementById('clearData').addEventListener('click',()=>{
-  if(confirm('Borrar estudiantes y asistencias?')){
-    localStorage.removeItem(STORAGE_STUDENTS);
-    localStorage.removeItem(STORAGE_ATT);
-    updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
-  }
-});
+document.getElementById('clearData').addEventListener('click',()=>{ if(confirm('Borrar estudiantes y asistencias?')){ localStorage.removeItem(STORAGE_STUDENTS); localStorage.removeItem(STORAGE_ATT); updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart(); } });
 
 // ------------------- Manual student -------------------
-document.getElementById('toggleManualForm').addEventListener('click',()=>{
-  const f=document.getElementById('manualStudentForm');
-  f.style.display=(f.style.display==='none')?'block':'none';
-});
+document.getElementById('toggleManualForm').addEventListener('click',()=>{ const f=document.getElementById('manualStudentForm'); f.style.display=(f.style.display==='none')?'block':'none'; });
 document.getElementById('addManualStudent').addEventListener('click',()=>{
   const name=document.getElementById('manualName').value.trim();
   const grade=document.getElementById('manualGrade').value.trim();
   if(!name||!grade){ alert('Ingrese nombre y grado'); return; }
   const arr=readStudents(); const newS={id:uid(), name, grade, createdAt:new Date().toISOString()}; arr.push(newS); writeStudents(arr);
   updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
-  // Generar QR automáticamente en panel de impresión
+  // Generar QR en pantalla
   const container=document.getElementById('print-area'); container.innerHTML=''; container.style.display='block';
   const label=document.createElement('div'); label.className='label';
   const holder=document.createElement('div'); label.appendChild(holder);
@@ -387,8 +367,3 @@ updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
 </script>
 </body>
 </html>
-
-
-
-
-
