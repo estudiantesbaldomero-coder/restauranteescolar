@@ -38,13 +38,11 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
 #exportPDF { background-color:black; color:white; font-weight:bold; }
 #clearData { background-color:#d32f2f; color:white; }
 #startScanner { border-color:#1976d2; color:#1976d2; }
-#stopScanner { border-color:#d32f2f; color:#d32f2f; }
+#stopScanner { border-color:#d32f2d; color:#d32f2d; }
 #toggleManualForm { background-color:#388e3c; color:white; font-weight:bold; }
 #addManualStudent { background-color:#1976d2; color:white; font-weight:bold; }
 /* Manual Student Form */
 #manualStudentForm { border:2px solid #388e3c; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
-/* Expand/Collapse Icon */
-#manualIcon, #dashboardIcon { display:inline-block; width:20px; text-align:center; margin-right:6px; font-weight:bold; cursor:pointer; }
 </style>
 </head>
 
@@ -87,7 +85,7 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
           <button id="exportPDF" class="btn w-100 mt-2">Exportar PDF</button>
         </div>
         <hr/>
-        <button id="toggleManualForm" class="btn w-100 mb-2"><span id="manualIcon">+</span> Agregar estudiante manualmente</button>
+        <button id="toggleManualForm" class="btn w-100 mb-2">Agregar estudiante manualmente</button>
         <div id="manualStudentForm">
           <input type="text" id="manualName" placeholder="Nombre completo" class="form-control mb-1">
           <input type="text" id="manualGrade" placeholder="Grado (ej. 10-3)" class="form-control mb-1">
@@ -101,14 +99,12 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
     <!-- Dashboard -->
     <div class="card mb-3">
       <div class="card-body">
-        <h5 id="toggleDashboard"><span id="dashboardIcon">-</span> Dashboard (tiempo real)</h5>
-        <div id="dashboardContent">
-          <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
-          <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
-          <p>Asistencias totales: <strong id="attTotal">0</strong></p>
-          <canvas id="attendanceChart" style="width:100%; height:200px;"></canvas>
-          <button id="clearData" class="btn btn-sm mt-2">Borrar toda la base (local)</button>
-        </div>
+        <h5>Dashboard (tiempo real)</h5>
+        <p>Total estudiantes: <strong id="totalStudents">0</strong></p>
+        <p>Asistencias hoy (<span id="todayDate"></span>): <strong id="attToday">0</strong></p>
+        <p>Asistencias totales: <strong id="attTotal">0</strong></p>
+        <canvas id="attendanceChart" style="width:100%; height:200px;"></canvas>
+        <button id="clearData" class="btn btn-sm mt-2">Borrar toda la base (local)</button>
       </div>
     </div>
   </div>
@@ -121,8 +117,8 @@ header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
 
 <script>
 // ------------------- STORAGE -------------------
-const STORAGE_STUDENTS='rs_students_v3';
-const STORAGE_ATT='rs_attendance_v3';
+const STORAGE_STUDENTS='rs_students_v2';
+const STORAGE_ATT='rs_attendance_v2';
 function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
 function writeStudents(arr){ localStorage.setItem(STORAGE_STUDENTS,JSON.stringify(arr)); }
 function readAttendance(){ return JSON.parse(localStorage.getItem(STORAGE_ATT)||'{}'); }
@@ -327,39 +323,52 @@ document.getElementById('exportPDF').addEventListener('click',()=>{
 });
 
 // ------------------- Clear data -------------------
-document.getElementById('clearData').addEventListener('click',()=>{ if(confirm('Borrar estudiantes y asistencias?')){ localStorage.removeItem(STORAGE_STUDENTS); localStorage.removeItem(STORAGE_ATT); updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart(); } });
+document.getElementById('clearData').addEventListener('click',()=>{
+  if(confirm('Borrar estudiantes y asistencias?')){ localStorage.removeItem(STORAGE_STUDENTS); localStorage.removeItem(STORAGE_ATT); updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart(); }
+});
 
 // ------------------- Manual student -------------------
-document.getElementById('toggleManualForm').addEventListener('click', ()=>{
+document.getElementById('toggleManualForm').addEventListener('click',()=>{
   const f=document.getElementById('manualStudentForm');
-  const icon=document.getElementById('manualIcon');
-  f.style.display = (f.style.display==='none')?'block':'none';
-  icon.textContent = (f.style.display==='none')?'+':'-';
+  f.style.display=(f.style.display==='none')?'block':'none';
 });
 
 document.getElementById('addManualStudent').addEventListener('click',()=>{
   const name=document.getElementById('manualName').value.trim();
   const grade=document.getElementById('manualGrade').value.trim();
   if(!name||!grade){ alert('Ingrese nombre y grado'); return; }
-  const arr=readStudents(); const newS={id:uid(), name, grade, createdAt:new Date().toISOString()}; arr.push(newS); writeStudents(arr);
-  updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
-  // Generar QR
-  const container=document.getElementById('print-area'); container.innerHTML=''; container.style.display='block';
-  const label=document.createElement('div'); label.className='label';
-  const holder=document.createElement('div'); label.appendChild(holder);
-  const nameEl=document.createElement('div'); nameEl.className='label-name'; nameEl.textContent=`${name} - ${grade}`; label.appendChild(nameEl);
-  container.appendChild(label);
-  new QRCode(holder,{text:JSON.stringify({name,grade}),width:140,height:140});
-  window.print(); container.style.display='none';
-  document.getElementById('manualName').value=''; document.getElementById('manualGrade').value='';
-});
 
-// ------------------- Dashboard collapse -------------------
-const dashboardContent=document.getElementById('dashboardContent');
-document.getElementById('toggleDashboard').addEventListener('click', ()=>{
-  dashboardContent.style.display = (dashboardContent.style.display==='none')?'block':'none';
-  const icon=document.getElementById('dashboardIcon');
-  icon.textContent = (dashboardContent.style.display==='none')?'+':'-';
+  // Guardar estudiante
+  const arr=readStudents(); 
+  const newS={id:uid(), name, grade, createdAt:new Date().toISOString()}; 
+  arr.push(newS); 
+  writeStudents(arr);
+  
+  updateGradeFilter(); 
+  renderDashboard(); 
+  renderTodayList(); 
+  renderChart();
+
+  // Mostrar QR en pantalla (no PDF)
+  const container=document.getElementById('print-area'); 
+  container.innerHTML=''; 
+  container.style.display='block';
+  const label=document.createElement('div'); 
+  label.className='label';
+  const holder=document.createElement('div'); 
+  label.appendChild(holder);
+  const nameEl=document.createElement('div'); 
+  nameEl.className='label-name'; 
+  nameEl.textContent=`${name} - ${grade}`; 
+  label.appendChild(nameEl);
+  container.appendChild(label);
+
+  // Crear QR
+  new QRCode(holder,{text:JSON.stringify({name,grade}),width:140,height:140});
+
+  // Limpiar formulario
+  document.getElementById('manualName').value=''; 
+  document.getElementById('manualGrade').value='';
 });
 
 // ------------------- Demo students -------------------
@@ -375,3 +384,4 @@ updateGradeFilter(); renderDashboard(); renderTodayList(); renderChart();
 </script>
 </body>
 </html>
+
