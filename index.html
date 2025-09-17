@@ -18,44 +18,22 @@
 
   <style>
     body { padding:1rem; background:#f4f6f9; }
-
-    /* Encabezado */
-    header {
-      display:flex; align-items:center; justify-content:center;
-      background: linear-gradient(90deg,#d32f2f,#1976d2,#388e3c);
-      padding:12px 20px; border-radius:10px; margin-bottom:1rem;
-      color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2);
-    }
+    header { display:flex; align-items:center; justify-content:center; background: linear-gradient(90deg,#d32f2f,#1976d2,#388e3c); padding:12px 20px; border-radius:10px; margin-bottom:1rem; color:white; box-shadow:0 3px 6px rgba(0,0,0,0.2); }
     header img { height:65px; margin-right:15px; }
     header h2 { margin:0; font-size:1.4rem; }
     header h3 { margin:0; font-size:1rem; font-weight:normal; opacity:0.9; }
-
-    /* Video escáner */
     #video { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; }
-
     .flash { animation: flashAnim 0.4s; }
     @keyframes flashAnim { 0%{background:#ffff99;}50%{background:#f4f6f9;}100%{background:#f4f6f9;} }
-
-    /* Impresión QR */
     @media print{
       body * { visibility:hidden; }
       #print-area,#print-area * { visibility:visible; }
-      #print-area {
-        position:absolute; left:0; top:0; width:100%;
-        display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box;
-      }
+      #print-area { position:absolute; left:0; top:0; width:100%; display:flex; flex-wrap:wrap; padding:10px; box-sizing:border-box; }
       .label{ width:32%; margin:1%; text-align:center; page-break-inside:avoid; display:flex; flex-direction:column; align-items:center; }
       .label-name{ margin-top:5px; font-size:12px; text-align:center; }
     }
-
-    /* QR Label */
-    .label { border:3px dashed #d32f2f; padding:6px; margin:6px;
-      display:inline-flex; flex-direction:column; align-items:center;
-      width:30%; border-radius:8px; background:white; }
-    .label .label-name { margin-top:6px; font-size:13px; text-align:center;
-      color:#d32f2f; font-weight:bold; }
-
-    /* Botones */
+    .label { border:3px dashed #d32f2f; padding:6px; margin:6px; display:inline-flex; flex-direction:column; align-items:center; width:30%; border-radius:8px; background:white; }
+    .label .label-name { margin-top:6px; font-size:13px; text-align:center; color:#d32f2f; font-weight:bold; }
     #importBtn { background-color:#388e3c; color:white; font-weight:bold; }
     #printAll { background-color:#1976d2; color:white; font-weight:bold; }
     #exportPDF { background-color:black; color:white; font-weight:bold; }
@@ -64,12 +42,8 @@
     #stopScanner { border-color:#d32f2f; color:#d32f2f; }
     #toggleManualForm { background-color:#388e3c; color:white; font-weight:bold; }
     #addManualStudent { background-color:#1976d2; color:white; font-weight:bold; }
-
-    /* Paneles colapsables */
     .card-header { cursor:pointer; font-weight:bold; background:#fff; color:#000; }
     .card-body{ border:2px solid #388e3c; border-radius:8px; }
-
-    /* Manual Student Form */
     #manualStudentForm { border:2px solid #388e3c; padding:10px; border-radius:8px; background:#fff; display:none; margin-bottom:1rem; }
   </style>
 </head>
@@ -87,7 +61,7 @@
     <div class="row g-3">
       <div class="col-lg-4">
 
-        <!-- Importar estudiantes CSV (siempre visible) -->
+        <!-- Importar estudiantes CSV -->
         <div class="card mb-3">
           <div class="card-body">
             <h5>Importar estudiantes (CSV)</h5>
@@ -96,7 +70,7 @@
           </div>
         </div>
 
-        <!-- Escáner QR (siempre visible) -->
+        <!-- Escáner QR -->
         <div class="card mb-3">
           <div class="card-body">
             <h5>Escáner QR</h5>
@@ -154,7 +128,6 @@
   </div>
 
 <script>
-// ---------- Utilidades ----------
 const STORAGE_STUDENTS='rs_students_v1';
 const STORAGE_ATT='rs_attendance_v1';
 function readStudents(){ return JSON.parse(localStorage.getItem(STORAGE_STUDENTS)||'[]'); }
@@ -170,15 +143,13 @@ const attTotalEl=document.getElementById('attTotal');
 document.getElementById('todayDate').textContent=todayKey();
 const gradeFilter=document.getElementById('gradeFilter');
 
-// ---------- Toggle Cards ----------
+// Toggle Cards
 function toggleCard(header){
   const body=header.nextElementSibling;
-  if(body.style.display==='none'||body.style.display===''){
-    body.style.display='block';
-  }else{ body.style.display='none'; }
+  body.style.display=(body.style.display==='none'||body.style.display==='')?'block':'none';
 }
 
-// ---------- CSV import ----------
+// CSV import
 document.getElementById('importBtn').addEventListener('click',()=>{
   const f=document.getElementById('csvFile').files[0];
   if(!f){ alert('Seleccione CSV'); return; }
@@ -199,7 +170,7 @@ document.getElementById('importBtn').addEventListener('click',()=>{
   });
 });
 
-// ---------- Dashboard ----------
+// Dashboard
 function renderDashboard(){
   const students=readStudents();
   const att=readAttendance(); const today=todayKey();
@@ -209,7 +180,7 @@ function renderDashboard(){
   renderChart();
 }
 
-// ---------- Chart ----------
+// Chart
 const ctx=document.getElementById('attendanceChart').getContext('2d');
 let attendanceChart=null;
 function renderChart(){
@@ -230,7 +201,7 @@ function getLast5Workdays(){
   return res;
 }
 
-// ---------- Filtro grados ----------
+// Filtro grados
 function updateGradeFilter(){
   const students=readStudents();
   const unique=[...new Set(students.map(s=>s.grade))].sort();
@@ -238,8 +209,9 @@ function updateGradeFilter(){
   unique.forEach(g=>{ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; gradeFilter.appendChild(opt); });
 }
 updateGradeFilter();
+gradeFilter.addEventListener('change', renderTodayList); // <-- Corrección importante
 
-// ---------- Lista asistencia hoy ----------
+// Lista asistencia hoy
 function renderTodayList(){
   const att=readAttendance();
   const today=todayKey();
@@ -262,7 +234,7 @@ function renderTodayList(){
   }
 }
 
-// ---------- Registrar asistencia QR ----------
+// Registrar asistencia QR
 function registerAttendanceQR(name, grade){
   const students=readStudents();
   const student=students.find(s=>s.name===name&&s.grade===grade);
@@ -276,7 +248,7 @@ function registerAttendanceQR(name, grade){
   return student.name;
 }
 
-// ---------- Scanner ----------
+// Scanner
 let videoStream=null, scanning=false;
 const video=document.getElementById('video');
 const canvas=document.getElementById('canvas');
@@ -325,7 +297,7 @@ function scanLoop(){
 }
 function speak(t){ const u=new SpeechSynthesisUtterance(t); window.speechSynthesis.speak(u); }
 
-// ---------- Print all QRs ----------
+// Print all QRs
 function buildPrintLabels(){
   const container=document.getElementById('print-area');
   container.innerHTML=''; container.style.display='block';
@@ -344,7 +316,7 @@ document.getElementById('printAll').addEventListener('click',()=>{
   setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },500);
 });
 
-// ---------- Export PDF ----------
+// Export PDF
 document.getElementById('exportPDF').addEventListener('click',()=>{
   const att=readAttendance(); const today=todayKey();
   if(!att[today]){ alert('No hay registros hoy'); return; }
@@ -364,7 +336,7 @@ document.getElementById('exportPDF').addEventListener('click',()=>{
   doc.save(`Estudiantes_${today}.pdf`);
 });
 
-// ---------- Clear data ----------
+// Clear data
 document.getElementById('clearData').addEventListener('click',()=>{
   if(confirm('Borrar estudiantes y asistencias?')){
     localStorage.removeItem(STORAGE_STUDENTS);
@@ -373,7 +345,7 @@ document.getElementById('clearData').addEventListener('click',()=>{
   }
 });
 
-// ---------- Agregar estudiante manual ----------
+// Agregar estudiante manual
 document.getElementById('toggleManualForm').addEventListener('click', ()=>{
   const f=document.getElementById('manualStudentForm');
   f.style.display = f.style.display==='none'?'block':'none';
@@ -389,7 +361,9 @@ document.getElementById('addManualStudent').addEventListener('click', ()=>{
   writeStudents(arr);
   updateGradeFilter(); renderDashboard(); renderTodayList();
 
-  // Generar QR temporal por 30 segundos
+  document.getElementById('manualName').value='';
+  document.getElementById('manualGrade').value='';
+
   const container=document.getElementById('print-area'); container.style.display='block';
   const label=document.createElement('div'); label.className='label';
   const holder=document.createElement('div'); label.appendChild(holder);
@@ -399,17 +373,22 @@ document.getElementById('addManualStudent').addEventListener('click', ()=>{
   const payload=JSON.stringify({name:student.name,grade:student.grade});
   new QRCode(holder,{text:payload,width:140,height:140});
   setTimeout(()=>{ container.removeChild(label); if(container.childElementCount===0) container.style.display='none'; },30000);
+
   alert('Estudiante agregado correctamente con su QR temporal (30s).');
 });
 
-// ---------- Demo ----------
+// Demo inicial
 if(readStudents().length===0){
-  const sample=[{id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
-  {id:uid(),name:'María Gómez',grade:'9-2',createdAt:new Date().toISOString()},
-  {id:uid(),name:'Juan Rodríguez',grade:'11-3',createdAt:new Date().toISOString()},
-  {id:uid(),name:'Ana Morales',grade:'10-2',createdAt:new Date().toISOString()}];
+  const sample=[
+    {id:uid(),name:'Carlos Pérez',grade:'10-1',createdAt:new Date().toISOString()},
+    {id:uid(),name:'María Gómez',grade:'9-2',createdAt:new Date().toISOString()},
+    {id:uid(),name:'Juan Rodríguez',grade:'11-3',createdAt:new Date().toISOString()},
+    {id:uid(),name:'Ana Morales',grade:'10-2',createdAt:new Date().toISOString()}
+  ];
   writeStudents(sample); updateGradeFilter(); renderDashboard(); renderTodayList();
 }
 </script>
 </body>
 </html>
+
+
